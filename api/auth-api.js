@@ -1,16 +1,20 @@
 const databaseFacade = require('../utils/database-facade')
 
 module.exports = {
-  async authorizeVolunteerUser (req, res, next) {
-
+  async authorizeAdminUser (req, res, next) {
+    return await this.authorizeUser(req, res, next, 'isadmin')
   },
 
-  async authorizeAdminUser (req, res, next) {
-    let query = 'SELECT * FROM user WHERE id=? AND isadmin=1'
+  async authorizeVolunteerUser (req, res, next) {
+    return await this.authorizeUser(req, res, next, 'isvolunteer')
+  },
+
+  async authorizeUser (req, res, next, userType) {
+    let query = `SELECT * FROM user WHERE id=? AND ${userType}=1`
     let queryParams = req.session.user.id
     let result = await databaseFacade.execute(query, queryParams)
     if (result.length === 0) {
-      if (next) { res.status(401).send('Unauthorized - must be admin user') }
+      if (next) { res.status(401).send('Unauthorized') }
       else { return false }
     }
     else {
