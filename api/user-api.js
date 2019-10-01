@@ -80,7 +80,7 @@ module.exports = {
 
   async authorizeUserOrAdmin (req, userId) {
     let user = authApi.getUser(req)
-    if (user.id !== userId || !authApi.authorizeAdminUser(req)) {
+    if (!user || user.id !== userId || !authApi.authorizeAdminUser(req)) {
       utils.throwError('No permission', 401)
     }
   },

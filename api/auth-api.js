@@ -10,16 +10,21 @@ module.exports = {
   },
 
   async authorizeUser (req, res, next, userType) {
-    let query = `SELECT * FROM user WHERE id=? AND ${userType}=1`
-    let queryParams = req.session.user.id
-    let result = await databaseFacade.execute(query, queryParams)
-    if (result.length === 0) {
-      if (next) { res.status(401).send('Unauthorized') }
-      else { return false }
+    let authorized = false
+    if (req.session && req.session.user) {
+      let query = `SELECT * FROM user WHERE id=? AND ${userType}=1`
+      let queryParams = req.session.user.id
+      let result = await databaseFacade.execute(query, queryParams)
+      authorized = result.length > 0
     }
-    else {
+
+    if (authorized) {
       if (next) { next() }
       else { return true }
+    }
+    else {
+      if (next) { res.status(401).send('Unauthorized') }
+      else { return false }
     }
   },
 
