@@ -1,12 +1,8 @@
 module.exports = function (err, req, res, next) {
-  if (!err.statusCode) {
-    err.statusCode = 500
-  }
-
-  if (!err.sendErrorMessage) {
-    err.message = 'Server error'
+  if (!err.isInentional) {
     console.error(err)
+    err.message = 'Server error'
   }
 
-  res.status(err.statusCode).send(err.message)
+  res.json({error: err.message})
 }

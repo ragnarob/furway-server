@@ -1,7 +1,7 @@
 const databaseFacade = require('../utils/database-facade')
 const handle = require('../utils/handle-route')
 const authApi = require('./auth-api')
-const utils = require('../utils/utils')
+const utils = require('../utils/utils.js')
 
 module.exports = {
   setupRoutes () {
@@ -20,10 +20,14 @@ module.exports = {
     app.post('/api/users', async (req, res, throwErr) => {
       let insertId = await handle(res, throwErr,
         this.createUser.bind(this), req.body.username, req.body.firstName, req.body.lastName, req.body.email, req.body.dateOfBirth, req.body.phone, req.body.isVegan, req.body.isFursuiter, req.body.allergiesText, req.body.addressLine1, req.body.addressLine2, req.body.addressCity, req.body.addressStateProvince, req.body.addressCountry, req.body.additionalInfo)
+      
+      await handle(req, throwErr,
+        authApi.login.bind(this), req.body.username, req.body.password1)
 
-      let newUserData = await handle(res, throwErr,
+      let userData = await handle(res, throwErr,
         this.getUser.bind(this), req, insertId)
-      res.json(newUserData)
+
+      res.json(userData)
     })
 
     app.post('/api/users/:id/updateprivileges', authApi.authorizeAdminUser, async (req, res, throwErr) => {
@@ -66,8 +70,8 @@ module.exports = {
   },
 
   async saveUser (req, userId, username, firstName, lastName, email, dateOfBirth, phone, isVegan, isFursuiter, allergiesText, addressLine1, addressLine2, addressCity, addressStateProvince, addressCountry, additionalInfo) {
-    if (!userId || !username || !firstName || !lastName || !email || !dateOfBirth || !phone || !addressLine1 || !addressCity || !addressCountry || !this.validateUsername(username)) {
-      utils.throwError('Missing or invalid fields', 400)
+    if (!userId || !username || !firstName || !lastName || !email || !dateOfBirth || !phone || !addressLine1 || !addressCity || !addressCountry || !utils.validateUsername(username)) {
+      utils.throwError('Missing or invalid fields')
     }
     await this.authorizeUserOrAdmin(req, userId)
 
@@ -79,22 +83,23 @@ module.exports = {
   },
 
   async authorizeUserOrAdmin (req, userId) {
-    let user = authApi.getUser(req)
+    let user = utils.getUserFromSession(req)
     if (!user || user.id !== userId || !authApi.authorizeAdminUser(req)) {
-      utils.throwError('No permission', 401)
+      utils.throwError('No permission')
     }
   },
 
   async createUser (username, password1, password2, firstName, lastName, email, dateOfBirth, phone, isVegan, isFursuiter, allergiesText, addressLine1, addressLine2, addressCity, addressStateProvince, addressCountry, additionalInfo) {
-    if (!username || !password1 || !password2 || !firstName || !lastName || !email || !dateOfBirth || !phone || !isVegan || !isFursuiter || !allergiesText || !addressLine1 || !addressCity || !addressCountry || !additionalInfo || !this.validateUsername(username) || !this.validatePassword(password1) || !this.validatePassword(password2) || !password1 !== password2) {
-      utils.throwError('Missing or invalid fields', 400)
+    if (!username || !password1 || !password2 || !firstName || !lastName || !email || !dateOfBirth || !phone || !isVegan || !isFursuiter || !allergiesText || !addressLine1 || !addressCity || !addressCountry || !additionalInfo) {
+      utils.throwError('Missing or invalid fields')
     }
+    
+    let hashedPassword = await authApi.validateUserAndHashPassword(username, password1, password2)
 
-    let createUserQuery = 'INSERT INTO user (username, firstname, lastname, email, dateofbirth, phone, isvegan, isfursuiter, allergiestext, addressline1, addressline2, addresscity, addressstateprovince, addresscountry, additionalinfo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-    let createUserQueryParams = [username, firstName, lastName, email, dateOfBirth, phone, isVegan, isFursuiter, allergiesText, addressLine1, addressLine2, addressCity, addressStateProvince, addressCountry, additionalInfo]
+    let createUserQuery = 'INSERT INTO user (username, password, firstname, lastname, email, dateofbirth, phone, isvegan, isfursuiter, allergiestext, addressline1, addressline2, addresscity, addressstateprovince, addresscountry, additionalinfo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    let createUserQueryParams = [username, hashedPassword, firstName, lastName, email, dateOfBirth, phone, isVegan, isFursuiter, allergiesText, addressLine1, addressLine2, addressCity, addressStateProvince, addressCountry, additionalInfo]
 
-    let result = await databaseFacade.execute(createUserQuery, createUserQueryParams)
-    return result.insertId
+    await databaseFacade.execute(createUserQuery, createUserQueryParams)
   },
 
   async updateUserPrivileges (userId, isVolunteer, isAdmin) {
@@ -104,12 +109,4 @@ module.exports = {
 
     return {success: true}
   },
-
-  validateUsername (username) {
-    return /^[a-zA-ZÆØÅæøå][\w\d_-ÆØÅæøå]{1,19}$/.test(username)
-  },
-
-  validatePassword (password) {
-    return password.length >= 6
-  }
 }
