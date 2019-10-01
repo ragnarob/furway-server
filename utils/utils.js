@@ -14,7 +14,7 @@ module.exports = {
   },
 
   getUserFromSession (req) {
-    if (!req.session || req.session.user) {
+    if (!req.session || !req.session.user) {
       return null
     }
     else {

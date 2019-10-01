@@ -1,8 +1,12 @@
 module.exports = function (err, req, res, next) {
+  let errorMessage
   if (!err.isInentional) {
     console.error(err)
-    err.message = 'Server error'
+    errorMessage = 'Server error'
+  }
+  else {
+    errorMessage = err.message
   }
 
-  res.json({error: err.message})
+  res.json({'error': errorMessage})
 }

@@ -14,7 +14,7 @@ const authMiddleware = module.exports = {
   setupRoutes () {
     app.post('/login', async (req, res, throwErr) => {
       let userData = await handle(res, throwErr,
-        this.login.bind(this), req.body.usernameOrEmail, req.body.password)
+        this.login.bind(this), req, req.body.usernameOrEmail, req.body.password)
       
       let fullUserData = await handle(res, throwErr,
         userApi.getUser.bind(this), req, userData.id)
@@ -49,7 +49,7 @@ const authMiddleware = module.exports = {
     })
   },
   
-  async login (usernameOrEmail, password) {
+  async login (req, usernameOrEmail, password) {
     let userData = await this.authenticate(usernameOrEmail, password)
     req.session.user = userData
     return userData
@@ -109,7 +109,7 @@ const authMiddleware = module.exports = {
              <p>Regards, the Furway team</p>`
     })
 
-    let updateUserQuery = 'UPDATE user SET tempPassword = ? WHERE email = ?'
+    let updateUserQuery = 'UPDATE user SET temppassword = ? WHERE email = ?'
     let updateUserQueryParams = [tempPassword, email]
     await databaseFacade.execute(updateUserQuery, updateUserQueryParams)
   },
@@ -127,17 +127,24 @@ const authMiddleware = module.exports = {
     if (!passwordMatch) {
       utils.throwError('Wrong password')
     }
-    
-    return userResult
+
+    return Object.assign({}, userResult)
   },
   
-  async validateUserAndHashPassword (username, password1, password2) {
-    let userExistsQuery = 'SELECT * FROM user WHERE username = ?'
-    let userExistsQueryParams = [username]
-    let existingUser = await databaseFacade.execute(userExistsQuery, userExistsQueryParams)
+  async validateUserAndHashPassword (username, email, password1, password2) {
+    let usernameExistsQuery = 'SELECT * FROM user WHERE username = ?'
+    let usernameExistsQueryParams = [username]
+    let existingUser = await databaseFacade.execute(usernameExistsQuery, usernameExistsQueryParams)
     if (existingUser.length > 0) {
-      utils.throwError('User already exists')
+      utils.throwError('This username is taken')
     }
+    let emailExistsQuery = 'SELECT * FROM user WHERE email = ?'
+    let emailExistsQueryParams = [email]
+    existingUser = await databaseFacade.execute(emailExistsQuery, emailExistsQueryParams)
+    if (existingUser.length > 0) {
+      utils.throwError('A user with this email already exists')
+    }
+
     if (!password1 === password2) {
       utils.throwError('Passwords don\'t match')
     }
@@ -177,6 +184,6 @@ const authMiddleware = module.exports = {
   },
 
   generateTempPassword () {
-    return Math.random().toString(36).substring(10);
+    return Math.random().toString(36).substring(12);
   }
 }
