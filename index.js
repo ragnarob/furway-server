@@ -21,6 +21,7 @@ app.use(session({
 app.use(express.static('./public'))
 
 require('./api/user-api').setupRoutes()
+require('./api/admin-api').setupRoutes()
 
 const errorHandler = require('./utils/error-handler')
 app.use(errorHandler)

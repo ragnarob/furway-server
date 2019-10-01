@@ -33,7 +33,7 @@ module.exports = {
     })
 
     app.post('/api/users/:id', async (req, res, throwErr) => {
-      let response = await handle(res, throwErr, 
+      await handle(res, throwErr, 
         this.saveUser.bind(this), req, Number(req.params.id), req.body.username, req.body.firstName, req.body.lastName, req.body.email, req.body.dateOfBirth, req.body.phone, req.body.isVegan, req.body.isFursuiter, req.body.allergiesText, req.body.addressLine1, req.body.addressLine2, req.body.addressCity, req.body.addressStateProvince, req.body.addressCountry, req.body.additionalInfo)
       
       let newUserData = await handle(res, throwErr,

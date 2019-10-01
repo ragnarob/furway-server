@@ -1,12 +1,12 @@
 const databaseFacade = require('../utils/database-facade')
 
-module.exports = {
+const authMiddleware = module.exports = {
   async authorizeAdminUser (req, res, next) {
-    return await this.authorizeUser(req, res, next, 'isadmin')
+    return await authMiddleware.authorizeUser(req, res, next, 'isadmin')
   },
 
   async authorizeVolunteerUser (req, res, next) {
-    return await this.authorizeUser(req, res, next, 'isvolunteer')
+    return await authMiddleware.authorizeUser(req, res, next, 'isvolunteer')
   },
 
   async authorizeUser (req, res, next, userType) {

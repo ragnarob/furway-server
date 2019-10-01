@@ -1,0 +1,10 @@
+{
+  "test": {
+    "no": "Hallo",
+    "en": "Hello"
+  },
+  "test2": {
+    "no": "Venn",
+    "en": "Friend"
+  }
+}
