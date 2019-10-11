@@ -152,7 +152,7 @@ const authMiddleware = module.exports = {
       utils.throwError('Invalid username or password')
     }
 
-    let hashedPassword = bcrypt.hash(password1, 8)
+    let hashedPassword = await bcrypt.hash(password1, 8)
     return hashedPassword
   },
   
