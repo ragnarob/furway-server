@@ -1,10 +1,19 @@
 const mysql = require('mysql')
 const databaseSettings = require('../config/database-settings.json')
 
-module.exports = {
+const facade = module.exports = {
   mysqlPool: mysql.createPool(databaseSettings),
 
-  execute (queryString, queryParams) {
+  queries: {
+    addRegistration: 'INSERT INTO registration (userid, roompreference, earlyarrival, latedeparture, buytshirt, buyhoodie) VALUES (?, ?, ?, ?, ?, ?)',
+    updateRegistration: 'UPDATE registration SET roompreference=?, earlyarrival=?, latedeparture=?, buytshirt=?, buyhoodie=? WHERE userid=?'
+  },
+
+  execute (queryStringOrName, queryParams) {
+    if (queryStringOrName in facade.queries) {
+      queryStringOrName = facade.queries[queryStringOrName]
+    }
+  
 		return new Promise (async (resolve, reject) => {
 			this.mysqlPool.getConnection((err, connection) => {
 				if (err) {
@@ -12,7 +21,7 @@ module.exports = {
         }
         
 				else if (queryParams) {
-					connection.query(queryString, queryParams, (err, results) => {
+					connection.query(queryStringOrName, queryParams, (err, results) => {
             connection.release()
             if (err) {
               reject(err.message)
@@ -24,7 +33,7 @@ module.exports = {
         }
         
 				else {
-					connection.query(queryString, (err, results) => {
+					connection.query(queryStringOrName, (err, results) => {
             connection.release()
             if (err) {
               reject(err.message)
