@@ -57,7 +57,7 @@ module.exports = {
   async getUser (req, userId) {
     await this.authorizeUserOrAdmin(req, userId)
 
-    let getUserQuery = 'SELECT user.id as id, user.username as username, user.firstname as firstName, user.lastname as lastName, user.email as email, user.dateofbirth as dateOfBirth, user.phone as phone, user.isvegan as isVegan, user.isFursuiter as isFursuiter, user.allergiestext as allergiestext, user.addressline1 as addressLine1, user.addressline2 as addressLine2, user.addresscity as addressCity, user.addressstateprovince as addressStateProvince, user.addresscountry as addressCountry, user.additionalinfo as additionalInfo, user.isvolunteer as isVolunteer, user.isadmin AS isAdmin, registration.id as registrationId FROM user LEFT JOIN registration ON (user.registrationId = registration.id) WHERE user.id=?'
+    let getUserQuery = 'SELECT user.id as id, user.username as username, user.firstname as firstName, user.lastname as lastName, user.email as email, user.dateofbirth as dateOfBirth, user.phone as phone, user.isvegan as isVegan, user.isFursuiter as isFursuiter, user.allergiestext as allergiestext, user.addressline1 as addressLine1, user.addressline2 as addressLine2, user.addresscity as addressCity, user.addressstateprovince as addressStateProvince, user.addresscountry as addressCountry, user.additionalinfo as additionalInfo, user.isvolunteer as isVolunteer, user.isadmin AS isAdmin, registration.id as registrationId FROM user LEFT JOIN registration ON (registration.userId = user.id) WHERE user.id=?'
     let getUserQueryParams = [userId]
     let userData = await databaseFacade.execute(getUserQuery, getUserQueryParams)
     
@@ -82,10 +82,12 @@ module.exports = {
 
   async authorizeUserOrAdmin (req, userId) {
     let user = utils.getUserFromSession(req)
-    let isAdmin = await authApi.authorizeAdminUser(req)
-    let userIdMatches = user && user.id === userId
+    if (user && user.id === userId) {
+      return
+    }
 
-    if (!isAdmin && !userIdMatches) {
+    let isAdmin = await authApi.authorizeAdminUser(req)
+    if (!isAdmin) {
       utils.throwError('No permission')
     }
   },
