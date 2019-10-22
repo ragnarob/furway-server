@@ -1,0 +1,22 @@
+{
+    "registrationOpenDate": "2020-03-25",
+    "registrationCloseDate": "2020-05-01",
+    "volunteerRegistrationOpenDate": "2020-03-15",
+    "numberOfInsideSpots": 40,
+    "numberOfOutsideSpots": 30,
+
+    "originalPaymentDeadline": "2019-05-10",
+    "merchPaymentDeadline": "2019-05-01",
+    "addEarlyOrLatePaymentDeadline": "2019-06-01",
+    "newRegShouldGetManuallySetDeadlineDate": "2019-05-01",
+    "finalRegPaymentDeadline": "2019-05-25",
+
+    "isSellingHoodies": true,
+    "isSellingTshirts": true,
+
+    "mainDaysPriceNok": 1000,
+    "earlyArrivalPriceNok": 400,
+    "lateDeparturePriceNok": 400,
+    "hoodiePriceNok": 500,
+    "tshirtPriceNok": 250
+}
