@@ -1,8 +1,8 @@
 module.exports = function (err, req, res, next) {
   let errorMessage
   if (!err.isInentional) {
-    console.error(err)
-    if (err.includes('DUP_ENTRY')) {
+    console.log(err)
+    if (err.message && err.message.includes('DUP_ENTRY')) {
       errorMessage = 'A user with this email or username already exists'
     }
     else {
@@ -13,5 +13,9 @@ module.exports = function (err, req, res, next) {
     errorMessage = err.message
   }
 
-  res.json({'error': errorMessage})
+  try {
+    res.json({'error': errorMessage})
+  }
+  catch (err) {
+  }
 }

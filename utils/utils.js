@@ -24,9 +24,7 @@ module.exports = {
 
   areFieldsDefinedAndNotNull (...fields) {
     for (let field of fields) {
-      console.log(field)
       if (field === undefined || field === null) {
-        console.log('FALSING')
         return false
       }
     }

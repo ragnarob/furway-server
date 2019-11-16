@@ -26,8 +26,7 @@ module.exports = {
   },
 
   async getAllUsers () {
-    let query = 'SELECT user.id as id, user.username as username, user.firstname as firstName, user.lastname as lastName, user.email as email, user.dateofbirth as dateOfBirth, user.phone as phone, user.isvegan as isVegan, user.isFursuiter as isfursuiter, user.allergiestext as allergiestext, user.addressline1 as addressline1, user.addressline2 as addressLine2, user.addresscity as addressCity, user.addressstateprovince as addressStateProvince, user.addresscountry as addressCountry, user.additionalinfo as additionalInfo, user.isvolunteer as isVolunteer, user.isadmin AS isAdmin, registration.id as registrationId FROM user LEFT JOIN registration ON (user.registrationId = registration.id)'
-    let users = await databaseFacade.execute(query)
+    let users = await databaseFacade.execute(databaseFacade.queries.getAllUsers)
     return users
   },
 
