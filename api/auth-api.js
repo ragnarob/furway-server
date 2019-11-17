@@ -1,7 +1,9 @@
-const handle = require('../utils/handle-route')
+const handlers = require('../utils/handle-route')
+const handle = handlers.handleRoute
+const handleAndAuthorize = handlers.handleRouteAndAuthorize
+
 const databaseFacade = require('../utils/database-facade')
 const utils = require('../utils/utils')
-const userApi = require('../api/user-api')
 
 const bcrypt = require('bcrypt')
 const nodemailer = require('nodemailer')
@@ -15,11 +17,8 @@ const authMiddleware = module.exports = {
     app.post('/login', async (req, res, throwErr) => {
       let userData = await handle(res, throwErr,
         this.login.bind(this), req, req.body.usernameOrEmail, req.body.password)
-      
-      let fullUserData = await handle(res, throwErr,
-        userApi.getUser.bind(this), req, userData.id)
 
-      res.json(fullUserData)
+      res.json(userData)
     })
 
     app.post('/logout', async (req, res, throwErr) => {
@@ -31,10 +30,7 @@ const authMiddleware = module.exports = {
       let newUserData = await handle(res, throwErr,
         this.changeUsername.bind(this), req.body.email, req.body.newUsername, req.body.password)
       
-      let newFullUserData = await handle (req, throwErr,
-        userApi.getUser.bind(this), newUserData.id)
-      
-      res.json(newFullUserData)
+      res.json(newUserData)
     })
 
     app.post('/changepassword', async (req, res, throwErr) => {
@@ -52,7 +48,10 @@ const authMiddleware = module.exports = {
   async login (req, usernameOrEmail, password) {
     let userData = await this.authenticate(usernameOrEmail, password)
     req.session.user = userData
-    return userData
+
+    let fullUserData = await databaseFacade.execute(databaseFacade.queries.getUserById, [userData.id])
+
+    return fullUserData[0]
   },
   
   logout () {
@@ -71,7 +70,10 @@ const authMiddleware = module.exports = {
 
     userData.username = newUsername
     req.session.user = userData
-    return userData
+
+    let fullUserData = await databaseFacade.execute(databaseFacade.queries.getUserById, [userData.id])
+
+    return fullUserData
   },
 
   async changePassword (usernameOrEmail, oldPassword, newPassword1, newPassword2) {

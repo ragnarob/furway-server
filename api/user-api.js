@@ -1,5 +1,7 @@
 const databaseFacade = require('../utils/database-facade')
-const handle = require('../utils/handle-route')
+const handlers = require('../utils/handle-route')
+const handle = handlers.handleRoute
+const handleAndAuthorize = handlers.handleRouteAndAuthorize
 const authApi = require('./auth-api')
 const utils = require('../utils/utils.js')
 
@@ -13,8 +15,8 @@ module.exports = {
     })
 
     app.get('/api/users/:id', async (req, res, throwErr) => {
-      let response = await handle(res, throwErr,
-        this.getUser.bind(this), req, Number(req.params.id))
+      let response = await handleAndAuthorize(req, res, throwErr, Number(req.params.id),
+        this.getUser.bind(this), Number(req.params.id))
       res.json(response)
     })
 
@@ -25,7 +27,7 @@ module.exports = {
         authApi.login.bind(authApi), req, req.body.username, req.body.password1)
 
       let userData = await handle(res, throwErr,
-        this.getUser.bind(this), req, insertId)
+        this.getUser.bind(this), insertId)
       res.json(userData)
     })
 
@@ -36,11 +38,12 @@ module.exports = {
     })
 
     app.post('/api/users/:id', async (req, res, throwErr) => {
-      await handle(res, throwErr, 
-        this.saveUser.bind(this), req, Number(req.params.id), req.body.username, req.body.firstName, req.body.lastName, req.body.email, req.body.dateOfBirth, req.body.phone, req.body.isVegan, req.body.isFursuiter, req.body.allergiesText, req.body.addressLine1, req.body.addressLine2, req.body.addressCity, req.body.addressStateProvince, req.body.addressCountry, req.body.additionalInfo)
+      await handleAndAuthorize(req, res, throwErr, Number(req.params.id),
+        this.saveUser.bind(this), Number(req.params.id), req.body.username, req.body.firstName, req.body.lastName, req.body.email, req.body.dateOfBirth, req.body.phone, req.body.isVegan, req.body.isFursuiter, req.body.allergiesText, req.body.addressLine1, req.body.addressLine2, req.body.addressCity, req.body.addressStateProvince, req.body.addressCountry, req.body.additionalInfo)
 
       let newUserData = await handle(res, throwErr,
-        this.getUser.bind(this), req, Number(req.params.id))
+        this.getUser.bind(this), Number(req.params.id))
+
       res.json(newUserData)
     })
   },
@@ -50,16 +53,13 @@ module.exports = {
       return {user: null}
     }
     else {
-      return await this.getUser(req, req.session.user.id)
+      return await this.getUser(req.session.user.id)
     }
   },
 
-  async getUser (req, userId) {
-    await this.authorizeUserOrAdmin(req, userId)
-
-    let getUserQuery = 'SELECT user.id as id, user.username as username, user.firstname as firstName, user.lastname as lastName, user.email as email, user.dateofbirth as dateOfBirth, user.phone as phone, user.isvegan as isVegan, user.isFursuiter as isFursuiter, user.allergiestext as allergiestext, user.addressline1 as addressLine1, user.addressline2 as addressLine2, user.addresscity as addressCity, user.addressstateprovince as addressStateProvince, user.addresscountry as addressCountry, user.additionalinfo as additionalInfo, user.isvolunteer as isVolunteer, user.isadmin AS isAdmin, registration.id as registrationId FROM user LEFT JOIN registration ON (registration.userId = user.id) WHERE user.id=?'
+  async getUser (userId) {
     let getUserQueryParams = [userId]
-    let userData = await databaseFacade.execute(getUserQuery, getUserQueryParams)
+    let userData = await databaseFacade.execute(databaseFacade.queries.getUserById, getUserQueryParams)
     
     if (userData.length === 0) {
       return {user: null}
@@ -67,11 +67,10 @@ module.exports = {
     return userData[0]
   },
 
-  async saveUser (req, userId, username, firstName, lastName, email, dateOfBirth, phone, isVegan, isFursuiter, allergiesText, addressLine1, addressLine2, addressCity, addressStateProvince, addressCountry, additionalInfo) {
+  async saveUser (userId, username, firstName, lastName, email, dateOfBirth, phone, isVegan, isFursuiter, allergiesText, addressLine1, addressLine2, addressCity, addressStateProvince, addressCountry, additionalInfo) {
     if (!userId || !username || !firstName || !lastName || !email || !dateOfBirth || !phone || !addressLine1 || !addressCity || !addressCountry || !utils.validateUsername(username)) {
       utils.throwError('Missing or invalid fields')
     }
-    await this.authorizeUserOrAdmin(req, userId)
 
     let saveUserQuery = 'UPDATE user SET username=?, firstname=?, lastname=?, email=?, dateofbirth=?, phone=?, isvegan=?, isfursuiter=?, allergiestext=?, addressline1=?, addressline2=?, addresscity=?, addressstateprovince=?, addresscountry=?, additionalinfo=? WHERE id=?'
     let saveUserQueryParams = [username, firstName, lastName, email, new Date(dateOfBirth), phone, isVegan, isFursuiter, allergiesText, addressLine1, addressLine2, addressCity, addressStateProvince, addressCountry, additionalInfo, userId]

@@ -1,5 +1,7 @@
 const databaseFacade = require('../utils/database-facade')
-const handle = require('../utils/handle-route')
+const handlers = require('../utils/handle-route')
+const handle = handlers.handleRoute
+const handleAndAuthorize = handlers.handleRouteAndAuthorize
 const authApi = require('./auth-api')
 const userApi = require('./user-api')
 const utils = require('../utils/utils.js')
@@ -15,20 +17,32 @@ module.exports = {
     })
 
     app.get('/api/registrations/user/:userId', async (req, res, throwErr) => {
-      let response = await handle(res, throwErr,
-        this.getRegistrationByUserId.bind(this), req, Number(req.params.userId))
+      let response = await handleAndAuthorize(req, res, throwErr, Number(req.params.userId),
+        this.getRegistrationByUserId.bind(this), Number(req.params.userId))
       res.json(response)
     })
     
     app.post('/api/registrations/user/:userId', async (req, res, throwErr) => {
-      let response = await handle(res, throwErr,
-        this.addRegistration.bind(this), req, Number(req.params.userId), req.body.roomPreference, req.body.earlyArrival, req.body.lateDeparture, req.body.buyTshirt, req.body.buyHoodie, req.body.tshirtSize, req.body.hoodieSize)
+      let response = await handleAndAuthorize(req, res, throwErr, Number(req.params.userId),
+        this.addRegistration.bind(this), Number(req.params.userId), req.body.roomPreference, req.body.earlyArrival, req.body.lateDeparture, req.body.buyTshirt, req.body.buyHoodie, req.body.tshirtSize, req.body.hoodieSize)
       res.json(response)
     })
     
     app.post('/api/registrations/user/:userId/update', async (req, res, throwErr) => {
+      let response = await handleAndAuthorize(req, res, throwErr, Number(req.params.userId),
+        this.updateRegistration.bind(this), Number(req.params.userId), req.body.roomPreference, req.body.earlyArrival, req.body.lateDeparture, req.body.buyTshirt, req.body.buyHoodie, req.body.tshirtSize, req.body.hoodieSize)
+      res.json(response)
+    })
+    
+    app.post('/api/registrations/user/:userId/delete', async (req, res, throwErr) => {
+      let response = await handleAndAuthorize(req, res, throwErr, Number(req.params.userId),
+        this.deleteRegistration.bind(this), Number(req.params.userId))
+      res.json(response)
+    })
+    
+    app.post('/api/registrations/user/:userId/update-payment-status', authApi.authorizeAdminUser, async (req, res, throwErr) => {
       let response = await handle(res, throwErr,
-        this.updateRegistration.bind(this), req, Number(req.params.userId), req.body.roomPreference, req.body.earlyArrival, req.body.lateDeparture, req.body.buyTshirt, req.body.buyHoodie, req.body.tshirtSize, req.body.hoodieSize)
+        this.updateRegistrationPaymentStatus.bind(this), Number(req.params.userId), req.body.isMainDaysInsidePaid, req.body.isMainDaysOutsidePaid, req.body.isLateDeparturePaid, req.body.isEarlyArrivalPaid, req.body.isHoodiePaid, req.body.isTshirtPaid)
       res.json(response)
     })
     
@@ -51,12 +65,6 @@ module.exports = {
 
       this.moveRegistrationsFromWaitingListIfPossible()
     })
-    
-    app.post('/api/registrations/user/:userId/delete', async (req, res, throwErr) => {
-      let response = await handle(res, throwErr,
-        this.deleteRegistration.bind(this), req, Number(req.params.userId))
-      res.json(response)
-    })
   },
 
 
@@ -70,9 +78,7 @@ module.exports = {
   },
 
 
-  async getRegistrationByUserId (req, userId) {
-    await this.authorizeUserOrAdmin(req, userId)
-
+  async getRegistrationByUserId (userId) {
     let registrationData = await databaseFacade.execute(databaseFacade.queries.getRegistration, [userId])
 
     if (registrationData.length === 0) {
@@ -82,7 +88,7 @@ module.exports = {
     registrationData = registrationData[0]
     registrationData.isTicketPaid = this.isRegistrationTicketPaid(registrationData)
 
-    return {registration: registrationData}
+    return registrationData
   },
 
 
@@ -92,10 +98,8 @@ module.exports = {
   },
 
 
-  async addRegistration (req, userId, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize) {
-    await this.authorizeUserOrAdmin(req, userId)
-
-    let existingRegistration = await this.getRegistrationByUserId(req, userId)
+  async addRegistration (userId, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize) {
+    let existingRegistration = await this.getRegistrationByUserId(userId)
     if (existingRegistration.registration !== null) {
       utils.throwError('This user already has a registration')
     }
@@ -104,7 +108,7 @@ module.exports = {
       utils.throwError('Missing or invalid fields')
     }
 
-    let userData = await userApi.getUser(req, userId)
+    let userData = await userApi.getUser(userId)
     let registrationOpenDate = userData.isVolunteer ? new Date(conInfo.volunteerRegistrationOpenDate) : new Date(conInfo.registrationOpenDate)
     if (new Date().getTime() < registrationOpenDate.getTime()) {
       utils.throwError('Registration has not yet opened')
@@ -119,10 +123,15 @@ module.exports = {
   },
 
 
-  async updateRegistration (req, userId, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize) {
-    await this.authorizeUserOrAdmin(req, userId)
+  async updateRegistrationPaymentStatus (userId, isMainDaysInsidePaid, isMainDaysOutsidePaid, isLateDeparturePaid, isEarlyArrivalPaid, isHoodiePaid, isTshirtPaid) {
+    await databaseFacade.execute(databaseFacade.queries.updateRegistrationPaymentStatus, [isMainDaysInsidePaid, isMainDaysOutsidePaid, isLateDeparturePaid, isEarlyArrivalPaid, isHoodiePaid, isTshirtPaid, userId])
 
-    let existingRegistration = await this.getRegistrationByUserId(req, userId)
+    return {success: true}
+  },
+
+
+  async updateRegistration (userId, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize) {
+    let existingRegistration = await this.getRegistrationByUserId(userId)
     if (existingRegistration.registration === null) {
       utils.throwError('This user has no registration')
     }
@@ -132,7 +141,7 @@ module.exports = {
     }
 
     if (existingRegistration.isAdminApproved === null) {
-      return await this.updateUnprocessedRegistration(roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize)
+      return await this.updateUnprocessedRegistration(userId, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize, false)
     }
     
     if (existingRegistration.isAdminApproved === 0) {
@@ -142,11 +151,13 @@ module.exports = {
     if (existingRegistration.isAdminApproved === 1) {
       return await this.updateApprovedRegistration(existingRegistration, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize)
     }
+
+    return {success: true}
   },
 
 
   async updateUnprocessedRegistration (userId, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize) {
-    await databaseFacade.execute(databaseFacade.queries.updateRegistration(userId, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize))
+    await databaseFacade.execute(databaseFacade.queries.updateRegistrationDetails, [roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize, userId])
     
     return {success: true}
   },
@@ -202,8 +213,15 @@ module.exports = {
   removeCurrentSpotAndAddToOtherQueue: async (newRoomPref, userId) => await databaseFacade.execute(databaseFacade.queries.updateRoomPreferenceAndResetSpot, [newRoomPref, userId]),
 
 
+  async deleteRegistration (userId) {
+    await databaseFacade.execute(databaseFacade.queries.deleteRegistration, [userId])
+
+    return {success: true}
+  },
+
+
   async updateUnpaidRegistration (userId, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize) {
-    await databaseFacade.execute(databaseFacade.queries.updateRegistration(userId, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize))
+    await databaseFacade.execute(databaseFacade.queries.updateRegistrationDetails(userId, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize))
     
     return {success: wtrue}
   },
@@ -252,8 +270,7 @@ module.exports = {
   async approveRegistration (userId) {
     await databaseFacade.execute(databaseFacade.queries.approveRegistration, [userId])
 
-    let allRegistrations = await this.getAllRegistrations()
-    let approvedRegistration = allRegistrations.find(r => r.userId === userId)
+    await this.moveRegistrationsFromWaitingListIfPossible()
 
     return {success: true}
   },
@@ -267,33 +284,31 @@ module.exports = {
 
 
   async moveRegistrationsFromWaitingListIfPossible () {
-    try {
-      let allRegistrations = await this.getAllRegistrations()
-      let availableSpots = this.getSpotAvailabilityCount(allRegistrations)
-  
-      while (availableSpots.inside > 0) {
-        let firstInsideRegistrationUserIdInWaitingList = await databaseFacade.execute(databaseFacade.queries.getFirstRegistrationUserIdInWaitingListInside)
-        await this.addInsideSpotToWaitingRegistration(firstInsideRegistrationUserIdInWaitingList)
-        
-        allRegistrations = await this.getAllRegistrations()
-        availableSpots = this.getSpotAvailabilityCount(allRegistrations)
-      }
-      while (availableSpots.outside > 0) {
-        let firstOutsideRegistrationUserIdInWaitingList = await databaseFacade.execute(databaseFacade.queries.getFirstRegistrationUserIdInWaitingListOutside)
-        await this.addOutsideSpotToWaitingRegistration(firstOutsideRegistrationUserIdInWaitingList)
-
-        allRegistrations = await this.getAllRegistrations()
-        availableSpots = this.getSpotAvailabilityCount(allRegistrations)
-      }
+    let allRegistrations = await this.getAllRegistrations()
+    let availableSpots = this.getSpotAvailabilityCount(allRegistrations)
+    
+    let firstInsideRegistrationUserIdInWaitingListId = (await databaseFacade.execute(databaseFacade.queries.getFirstRegistrationUserIdInWaitingListInside))[0]
+    while (availableSpots.inside>0 && firstInsideRegistrationUserIdInWaitingListId!=undefined) {
+      await this.addInsideSpotToWaitingRegistration(firstInsideRegistrationUserIdInWaitingListId.userid)
+      
+      allRegistrations = await this.getAllRegistrations()
+      availableSpots = this.getSpotAvailabilityCount(allRegistrations)
+      firstInsideRegistrationUserIdInWaitingListId = (await databaseFacade.execute(databaseFacade.queries.getFirstRegistrationUserIdInWaitingListInside))[0]
     }
-    catch (err) {
-      console.error(err)
+
+    let firstOutsideRegistrationUserIdInWaitingListId = (await databaseFacade.execute(databaseFacade.queries.getFirstRegistrationUserIdInWaitingListOutside))[0]
+    while (availableSpots.outside>0 && firstOutsideRegistrationUserIdInWaitingListId!=undefined) {
+      await this.addOutsideSpotToWaitingRegistration(firstOutsideRegistrationUserIdInWaitingListId.userid)
+
+      allRegistrations = await this.getAllRegistrations()
+      availableSpots = this.getSpotAvailabilityCount(allRegistrations)
+      firstOutsideRegistrationUserIdInWaitingListId = (await databaseFacade.execute(databaseFacade.queries.getFirstRegistrationUserIdInWaitingListOutside))[0]
     }
   },
 
 
   async addInsideSpotToWaitingRegistration (userId) {
-    let registration = this.getRegistrationByUserId(userId)
+    let registration = await this.getRegistrationByUserId(userId)
 
     if (registration.roomPreference === 'insideonly' || 
         registration.roomPreference === 'insidepreference' && !registration.receivedOutsideSpot) {
@@ -327,11 +342,11 @@ module.exports = {
 
 
   isAutomaticPaymentDeadlineAssignmentAvailable () {
-    return new Date().getTime() < new Date(conInfo.newRegShouldGetManuallySetDeadlineDate).getTime()
+    return new Date() < new Date(conInfo.newRegShouldGetManuallySetDeadlineDate)
   },
 
 
-  async getSpotAvailabilityCount (allRegistrations) {
+  getSpotAvailabilityCount (allRegistrations) {
     let insideSpotsAvailable = conInfo.numberOfInsideSpots - allRegistrations.filter(r => r.receivedInsideSpot).length
     let outsideSpotsAvailable = conInfo.numberOfOutsideSpots - allRegistrations.filter(r => r.receivedOutsideSpot).length
     return {
@@ -347,16 +362,17 @@ module.exports = {
     return {success: true}
   },
 
-
-  async deleteRegistration (req, userId) {
-    await databaseFacade.execute(databaseFacade.queries.deleteRegistration, [userId])
-
-    return {success: true}
+  async authorizeAdmin (req) {
+    let isAdmin = await authApi.authorizeAdminUser(req)
+    if (!isAdmin) {
+      utils.throwError('No permission')
+    }
   },
 
 
   async authorizeUserOrAdmin (req, userId) {
     let user = utils.getUserFromSession(req)
+
     if (user && user.id === userId) {
       return
     }
@@ -369,10 +385,11 @@ module.exports = {
 
 
   validateRegistrationDetails (userId, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize) {
+    let isRoomPreferenceLegal = ['insideonly', 'insidepreference', 'outsideonly'].includes(roomPreference.toLowerCase())
     let areFieldsOk = utils.areFieldsDefinedAndNotNull(userId, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie)
     let areMerchSizesOk = this.areMerchAndSizesValid(buyHoodie, hoodieSize, buyTshirt, tshirtSize)
 
-    return areFieldsOk && areMerchSizesOk
+    return isRoomPreferenceLegal && areFieldsOk && areMerchSizesOk
   },
 
 
