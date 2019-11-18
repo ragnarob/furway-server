@@ -60,7 +60,7 @@ module.exports = {
     
     app.post('/api/registrations/user/:userId/removespot', authApi.authorizeAdminUser, async (req, res, throwErr) => {
       let response = await handle(res, throwErr,
-        this.removeSpotFromRegistration.bind(this), req, Number(req.params.userId));
+        this.removeSpotFromRegistration.bind(this), Number(req.params.userId));
       res.json(response)
 
       this.moveRegistrationsFromWaitingListIfPossible()
@@ -276,8 +276,10 @@ module.exports = {
   },
 
 
-  async removeSpotFromRegistration (req, userId) {
+  async removeSpotFromRegistration (userId) {
     await databaseFacade.execute(databaseFacade.queries.removeSpotFromRegistration, [userId])
+
+    await this.moveRegistrationsFromWaitingListIfPossible()
 
     return {success: true}
   },
@@ -287,22 +289,22 @@ module.exports = {
     let allRegistrations = await this.getAllRegistrations()
     let availableSpots = this.getSpotAvailabilityCount(allRegistrations)
     
-    let firstInsideRegistrationUserIdInWaitingListId = (await databaseFacade.execute(databaseFacade.queries.getFirstRegistrationUserIdInWaitingListInside))[0]
-    while (availableSpots.inside>0 && firstInsideRegistrationUserIdInWaitingListId!=undefined) {
-      await this.addInsideSpotToWaitingRegistration(firstInsideRegistrationUserIdInWaitingListId.userid)
+    let firstInsideRegistrationUserIdInWaitingList = (await databaseFacade.execute(databaseFacade.queries.getFirstRegistrationUserIdInWaitingListInside))[0]
+    while (availableSpots.inside>0 && firstInsideRegistrationUserIdInWaitingList!=undefined) {
+      await this.addInsideSpotToWaitingRegistration(firstInsideRegistrationUserIdInWaitingList.userid)
       
       allRegistrations = await this.getAllRegistrations()
       availableSpots = this.getSpotAvailabilityCount(allRegistrations)
-      firstInsideRegistrationUserIdInWaitingListId = (await databaseFacade.execute(databaseFacade.queries.getFirstRegistrationUserIdInWaitingListInside))[0]
+      firstInsideRegistrationUserIdInWaitingList = (await databaseFacade.execute(databaseFacade.queries.getFirstRegistrationUserIdInWaitingListInside))[0]
     }
 
-    let firstOutsideRegistrationUserIdInWaitingListId = (await databaseFacade.execute(databaseFacade.queries.getFirstRegistrationUserIdInWaitingListOutside))[0]
-    while (availableSpots.outside>0 && firstOutsideRegistrationUserIdInWaitingListId!=undefined) {
-      await this.addOutsideSpotToWaitingRegistration(firstOutsideRegistrationUserIdInWaitingListId.userid)
+    let firstOutsideRegistrationUserIdInWaitingList = (await databaseFacade.execute(databaseFacade.queries.getFirstRegistrationUserIdInWaitingListOutside))[0]
+    while (availableSpots.outside>0 && firstOutsideRegistrationUserIdInWaitingList!=undefined) {
+      await this.addOutsideSpotToWaitingRegistration(firstOutsideRegistrationUserIdInWaitingList.userid)
 
       allRegistrations = await this.getAllRegistrations()
       availableSpots = this.getSpotAvailabilityCount(allRegistrations)
-      firstOutsideRegistrationUserIdInWaitingListId = (await databaseFacade.execute(databaseFacade.queries.getFirstRegistrationUserIdInWaitingListOutside))[0]
+      firstOutsideRegistrationUserIdInWaitingList = (await databaseFacade.execute(databaseFacade.queries.getFirstRegistrationUserIdInWaitingListOutside))[0]
     }
   },
 
@@ -322,7 +324,7 @@ module.exports = {
 
     else if (registration.roomPreference === 'insidepreference' && registration.receivedOutsideSpot) {
       if (this.isAutomaticPaymentDeadlineAssignmentAvailable()) {
-        await databaseFacade.execute(databaseFacade.queries.addInsideSpotToRegistrationAndRemoveOutsideSpot, [conInfo.originalPaymentDeadline], userId)
+        await databaseFacade.execute(databaseFacade.queries.addInsideSpotToRegistrationAndRemoveOutsideSpot, [conInfo.originalPaymentDeadline, userId])
       }
       else {
         await databaseFacade.execute(databaseFacade.queries.addInsideSpotWithoutDeadlineToRegistrationAndRemoveOutsideSpot, [userId])

@@ -13,6 +13,8 @@ const facade = module.exports = {
 
     getRegistration: 'SELECT id AS id, userid AS userId, roompreference AS roomPreference, earlyarrival AS earlyArrival, latedeparture AS lateDeparture, buytshirt AS buyTshirt, buyhoodie AS buyHoodie, tshirtsize AS tshirtSize, hoodiesize AS hoodiesize, timestamp AS timestamp, paymentdeadline AS paymentDeadline, needsmanualpaymentdeadline AS needsManualPaymentDeadline, isadminapproved AS isAdminApproved, receivedinsidespot AS receivedInsideSpot, receivedoutsidespot AS receivedOutsideSpot, adminrejectedreason as adminRejectedReason, ismaindaysinsidepaid AS isMainDaysInsidePaid, ismaindaysoutsidepaid AS isMainDaysOutsidePaid, isearlyarrivalpaid AS isEarlyArrivalPaid, islatedeparturepaid AS isLateDeparturePaid, ishoodiepaid AS isHoodiePaid, istshirtpaid AS isTshirtPaid FROM registration WHERE userId = ?',
 
+    getWaitingListRegistrations: `SELECT id AS id, userid AS userId, roompreference AS roomPreference, earlyarrival AS earlyArrival, latedeparture AS lateDeparture, buytshirt AS buyTshirt, buyhoodie AS buyHoodie, tshirtsize AS tshirtSize, hoodiesize AS hoodiesize, timestamp AS timestamp, paymentdeadline AS paymentDeadline, needsmanualpaymentdeadline AS needsManualPaymentDeadline, isadminapproved AS isAdminApproved, receivedinsidespot AS receivedInsideSpot, receivedoutsidespot AS receivedOutsideSpot, adminrejectedreason as adminRejectedReason, ismaindaysinsidepaid AS isMainDaysInsidePaid, ismaindaysoutsidepaid AS isMainDaysOutsidePaid, isearlyarrivalpaid AS isEarlyArrivalPaid, islatedeparturepaid AS isLateDeparturePaid, ishoodiepaid AS isHoodiePaid, istshirtpaid AS isTshirtPaid FROM registration WHERE isadminapproved=1 AND receivedinsidespot=0 AND (receivedoutsidespot=0 OR roompreference='insidepreference') ORDER BY timestamp ASC`,
+
     addRegistration: 'INSERT INTO registration (userid, roompreference, earlyarrival, latedeparture, buytshirt, buyhoodie, tshirtsize, hoodiesize) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
 
     deleteRegistration: 'DELETE FROM registration WHERE userid = ?',
@@ -25,13 +27,13 @@ const facade = module.exports = {
 
     rejectRegistration: 'UPDATE registration SET isadminapproved = 0, adminrejectedreason = ? WHERE userid = ?',
 
-    removeSpotFromRegistration: 'UPDATE registration SET receivedinsidespot = 0, receivedoutsidespot = 0, timestamp = NOW() WHERE userid = ?',
+    removeSpotFromRegistration: 'UPDATE registration SET receivedinsidespot = 0, receivedoutsidespot = 0, isadminapproved = 0, timestamp = NOW() WHERE userid = ?',
 
     deleteRegistration: 'DELETE FROM registration WHERE userid = ?',
 
-    getFirstRegistrationUserIdInWaitingListInside: `SELECT userid FROM registration WHERE receivedinsidespot=0 AND (roompreference='insideonly' OR roompreference='insidepreference') AND isadminapproved=1 ORDER BY timestamp ASC LIMIT 1`,
+    getFirstRegistrationUserIdInWaitingListInside: `SELECT userid FROM registration WHERE receivedinsidespot=0 AND (roompreference='insideonly' OR roompreference='insidepreference') AND isadminapproved=1 AND ismaindaysinsidepaid=0 ORDER BY timestamp ASC LIMIT 1`,
 
-    getFirstRegistrationUserIdInWaitingListOutside: `SELECT userid FROM registration WHERE receivedoutsidespot=0 AND receivedinsidespot=0 AND (roompreference='outsideonly' OR roompreference='insidepreference') AND isadminapproved=1 ORDER BY timestamp ASC LIMIT 1`,
+    getFirstRegistrationUserIdInWaitingListOutside: `SELECT userid FROM registration WHERE receivedoutsidespot=0 AND receivedinsidespot=0 AND (roompreference='outsideonly' OR roompreference='insidepreference') AND isadminapproved=1 AND ismaindaysoutsidepaid=0 ORDER BY timestamp ASC LIMIT 1`,
 
     addInsideSpotToRegistration: `UPDATE registration SET receivedinsidespot = 1, paymentdeadline = ? WHERE userid = ?`,
     addOutsideSpotToRegistration: `UPDATE registration SET receivedoutsidespot = 1, paymentdeadline = ? WHERE userid = ?`,

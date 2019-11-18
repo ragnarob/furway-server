@@ -1,5 +1,7 @@
 const databaseFacade = require('../utils/database-facade')
-const handle = require('../utils/handle-route')
+const handlers = require('../utils/handle-route')
+const handle = handlers.handleRoute
+const handleAndAuthorize = handlers.handleRouteAndAuthorize
 const authApi = require('./auth-api')
 const utils = require('../utils/utils')
 const fileSystemFacade = require('../utils/file-system-facade')
@@ -9,6 +11,12 @@ module.exports = {
     app.get('/api/users', authApi.authorizeAdminUser, async (req, res, throwErr) => {
       let response = await handle(res, throwErr,
         this.getAllUsers.bind(this))
+      res.json(response)
+    })
+
+    app.get('/api/waitinglist', authApi.authorizeAdminUser, async (req, res, throwErr) => {
+      let response = await handle(res, throwErr,
+        this.getWaitingLists.bind(this))
       res.json(response)
     })
 
@@ -28,6 +36,39 @@ module.exports = {
   async getAllUsers () {
     let users = await databaseFacade.execute(databaseFacade.queries.getAllUsers)
     return users
+  },
+
+  async getWaitingLists () {
+    let registrationsInWaitingList = await databaseFacade.execute(databaseFacade.queries.getWaitingListRegistrations)
+    let waitingLists = {'inside': [], 'outside': []}
+    let insideCounter = outsideCounter = 1
+    for (let reg of registrationsInWaitingList) {
+      if (reg['roomPreference'] === 'insideonly') {
+        reg.waitingListNumber = insideCounter
+        waitingLists.inside.push(reg)
+        insideCounter++
+      }
+
+      else if (reg['roomPreference'] === 'outsideonly') {
+        reg.waitingListNumber = outsideCounter
+        waitingLists.outside.push(reg)
+        outsideCounter++
+      }
+
+      else if (reg['roomPreference'] === 'insidepreference') {
+        reg.waitingListNumber = insideCounter
+        waitingLists.inside.push(reg)
+        insideCounter++
+
+        if (reg['receivedOutsideSpot'] === 0) {
+          reg.waitingListNumber = outsideCounter
+          waitingLists.outside.push(reg)
+          outsideCounter++
+        }
+      }
+    }
+
+    return waitingLists
   },
 
   async getAllTextContent () {
