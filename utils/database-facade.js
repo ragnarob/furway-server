@@ -21,9 +21,11 @@ const facade = module.exports = {
 
     updateRegistrationDetails: 'UPDATE registration SET roompreference=?, earlyarrival=?, latedeparture=?, buytshirt=?, buyhoodie=?, tshirtsize=?, hoodiesize=? WHERE userid=?',
 
+    updateRejectedRegistrationDetails: 'UPDATE registration SET roompreference=?, earlyarrival=?, latedeparture=?, buytshirt=?, buyhoodie=?, tshirtsize=?, hoodiesize=?, timestamp=NOW(), adminrejectedreason = NULL WHERE userid=?',
+
     updateRegistrationPaymentStatus: 'UPDATE registration SET ismaindaysinsidePaid=?, ismaindaysoutsidepaid=?, islatedeparturepaid=?, isearlyarrivalpaid=?, ishoodiepaid=?, istshirtpaid=? WHERE userid=?',
 
-    approveRegistration: 'UPDATE registration SET isadminapproved = 1 WHERE userid = ?',
+    approveRegistration: 'UPDATE registration SET isadminapproved = 1, adminrejectedreason = NULL WHERE userid = ?',
 
     rejectRegistration: 'UPDATE registration SET isadminapproved = 0, adminrejectedreason = ? WHERE userid = ?',
 

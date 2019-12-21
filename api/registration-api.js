@@ -175,11 +175,7 @@ module.exports = {
       await this.updateRoomPreference(existingRegistration, roomPreference)
     }
 
-    // todo vi må gjøre mer også
-    // etter denne altid kalle den som flytter fra venteliste til give spot
-
     await this.moveRegistrationsFromWaitingListIfPossible()
-
   },
 
 
@@ -228,7 +224,9 @@ module.exports = {
 
 
   async updateRejectedRegistration (userId, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize) {
-    // update timestamp
+    await databaseFacade.execute(databaseFacade.queries.updateRejectedRegistrationDetails(userId, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize))
+
+    return {success: true}
   },
 
   

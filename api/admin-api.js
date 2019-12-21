@@ -44,24 +44,24 @@ module.exports = {
     let insideCounter = outsideCounter = 1
     for (let reg of registrationsInWaitingList) {
       if (reg['roomPreference'] === 'insideonly') {
-        reg.waitingListNumber = insideCounter
+        reg.insideWaitingListNumber = insideCounter
         waitingLists.inside.push(reg)
         insideCounter++
       }
 
       else if (reg['roomPreference'] === 'outsideonly') {
-        reg.waitingListNumber = outsideCounter
+        reg.outsideWaitingListNumber = outsideCounter
         waitingLists.outside.push(reg)
         outsideCounter++
       }
 
       else if (reg['roomPreference'] === 'insidepreference') {
-        reg.waitingListNumber = insideCounter
+        reg.insideWaitingListNumber = insideCounter
         waitingLists.inside.push(reg)
         insideCounter++
 
         if (reg['receivedOutsideSpot'] === 0) {
-          reg.waitingListNumber = outsideCounter
+          reg.outsideWaitingListNumber = outsideCounter
           waitingLists.outside.push(reg)
           outsideCounter++
         }
