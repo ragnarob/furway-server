@@ -46,6 +46,9 @@ const authMiddleware = module.exports = {
   },
   
   async login (req, usernameOrEmail, password) {
+    if (!usernameOrEmail || !password) {
+      utils.throwError('Missing username/email or password')
+    }
     let userData = await this.authenticate(usernameOrEmail, password)
     req.session.user = userData
 

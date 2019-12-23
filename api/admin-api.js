@@ -20,6 +20,12 @@ module.exports = {
       res.json(response)
     })
 
+    app.get('/api/pending-registrations', authApi.authorizeAdminUser, async (req, res, throwErr) => {
+      let response = await handle(res, throwErr,
+        this.getPendingRegistrations.bind(this))
+      res.json(response)
+    })
+
     app.get('/api/static-content', authApi.authorizeAdminUser, async (req, res, throwErr) => {
       let response = await handle(res, throwErr,
         this.getAllTextContent.bind(this))
