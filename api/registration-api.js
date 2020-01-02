@@ -16,6 +16,14 @@ module.exports = {
       res.json(response)
     })
 
+    app.get('/api/registrations/pending', authApi.authorizeAdminUser, async (req, res, throwErr) => {
+      let allRegistrations = await handle(res, throwErr,
+        this.getAllRegistrations.bind(this))
+      let filteredRegistrations = await handle(res, throwErr,
+        this.filterRegistrationsByUnapproved, allRegistrations)
+      res.json(filteredRegistrations)
+    })
+
     app.get('/api/registrations/user/:userId', async (req, res, throwErr) => {
       let response = await handleAndAuthorize(req, res, throwErr, Number(req.params.userId),
         this.getRegistrationByUserId.bind(this), Number(req.params.userId))
@@ -24,7 +32,7 @@ module.exports = {
     
     app.post('/api/registrations/user/:userId', async (req, res, throwErr) => {
       let response = await handleAndAuthorize(req, res, throwErr, Number(req.params.userId),
-        this.addRegistration.bind(this), Number(req.params.userId), req.body.roomPreference, req.body.earlyArrival, req.body.lateDeparture, req.body.buyTshirt, req.body.buyHoodie, req.body.tshirtSize, req.body.hoodieSize)
+        this.addRegistration.bind(this), Number(req.params.userId), req.body.roomPreference)
       res.json(response)
     })
     
@@ -54,7 +62,7 @@ module.exports = {
     
     app.post('/api/registrations/user/:userId/reject', authApi.authorizeAdminUser, async (req, res, throwErr) => {
       let response = await handle(res, throwErr,
-        this.rejectRegistration.bind(this), Number(req.params.userId), req.body.reason);
+        this.rejectRegistration.bind(this), Number(req.params.userId));
       res.json(response)
     })
     
@@ -70,11 +78,24 @@ module.exports = {
 
   async getAllRegistrations () {
     let allRegistrations = await databaseFacade.execute(databaseFacade.queries.getAllRegistrations)
+    
     for (let registration of allRegistrations) {
-      registration.isTicketPaid = this.isRegistrationTicketPaid(registration)
+      registration.isMainDaysPaid = this.isMainDaysPaid(registration)
+      registration.isAddonsPaid = this.isAddonsPaid(registration)
+
+      let amounts = this.getPaidAndUnpaidAmount(registration)
+      registration.paidAmount = amounts.paid
+      registration.unpaidAmount = amounts.unpaid
+
+      this.parseRegistrationBooleans(registration)
     }
 
     return allRegistrations
+  },
+
+
+  async filterRegistrationsByUnapproved (allRegistrations) {
+    return allRegistrations.filter(reg => reg.isAdminApproved === null) 
   },
 
 
@@ -86,27 +107,68 @@ module.exports = {
     }
 
     registrationData = registrationData[0]
-    registrationData.isTicketPaid = this.isRegistrationTicketPaid(registrationData)
+    registrationData.isMainDaysPaid = this.isMainDaysPaid(registrationData)
+    registrationData.isAddonsPaid = this.isAddonsPaid(registrationData)
+    this.parseRegistrationBooleans(registrationData)
+    console.log(registrationData)
 
     return registrationData
   },
 
 
-  isRegistrationTicketPaid (registration) {
+  isMainDaysPaid (registration) {
     return registration.receivedInsideSpot && registration.isMainDaysInsidePaid
            || registration.receivedOutsideSpot && registration.isMainDaysOutsidePaid
   },
 
 
-  async addRegistration (userId, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize) {
+  isAddonsPaid (registration) {
+    return registration.buyHoodie ? registration.isHoodiePaid : true
+           && registration.buyTshirt ? registration.isTshirtPaid : true
+           && registration.earlyArrival ? registration.isEarlyArrivalPaid : true
+           && registration.lateDeparture ? registration.isLateDeparturePaid : true 
+  },
+
+
+  getPaidAndUnpaidAmount (registration) {
+    let unpaidAmount = 0
+    let paidAmount = 0
+    if (this.isMainDaysPaid(registration)) { paidAmount += conInfo.mainDaysPriceNok }
+    else { unpaidAmount += conInfo.mainDaysPriceNok }
+
+    if (registration.earlyArrival) {
+      if (registration.isEarlyArrivalPaid) { paidAmount += conInfo.earlyArrivalPriceNok }
+      else { unpaidAmount += conInfo.earlyArrivalPriceNok }
+    }
+    if (registration.lateDeparture) {
+      if (registration.isLateDeparturePaid) { paidAmount += conInfo.lateDeparturePriceNok }
+      else { unpaidAmount += conInfo.lateDeparturePriceNok }
+    }
+    if (registration.buyHoodie) {
+      if (registration.isHoodiePaid) { paidAmount += conInfo.hoodiePriceNok }
+      else { unpaidAmount += conInfo.hoodiePriceNok }
+    }
+    if (registration.buyTshirt) {
+      if (registration.isTshirtPaid) { paidAmount += conInfo.tshirtPriceNok }
+      else { unpaidAmount += conInfo.tshirtPriceNok }
+    }
+
+    return {
+      paid: paidAmount,
+      unpaid: unpaidAmount
+    }
+  },
+
+
+  async addRegistration (userId, roomPreference) {
     let existingRegistration = await this.getRegistrationByUserId(userId)
     if (existingRegistration.registration !== null) {
       utils.throwError('This user already has a registration')
     }
-    
-    if (!this.validateRegistrationDetails (userId, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize)) {
-      utils.throwError('Missing or invalid fields')
-    }
+
+    if (!this.isRoomPreferenceLegal(roomPreference)) {
+      utils.throwError('Invalid room preference')
+    } 
 
     let userData = await userApi.getUser(userId)
     let registrationOpenDate = userData.isVolunteer ? new Date(conInfo.volunteerRegistrationOpenDate) : new Date(conInfo.registrationOpenDate)
@@ -117,7 +179,7 @@ module.exports = {
       utils.throwError('Registration has closed')
     }
 
-    await databaseFacade.execute(databaseFacade.queries.addRegistration, [userId, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize])
+    await databaseFacade.execute(databaseFacade.queries.addRegistration, [userId, roomPreference])
 
     return {success: true}
   },
@@ -135,13 +197,17 @@ module.exports = {
     if (existingRegistration.registration === null) {
       utils.throwError('This user has no registration')
     }
-    
-    if (!this.validateRegistrationDetails (userId, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize)) {
-      utils.throwError('Missing or invalid fields')
+
+    if (!this.isRoomPreferenceLegal) {
+      utils.throwError('Invalid room preference')
     }
 
     if (existingRegistration.isAdminApproved === null) {
-      return await this.updateUnprocessedRegistration(userId, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize, false)
+      return await this.updateUnprocessedRegistration(userId, roomPreference)
+    }
+    
+    if (!this.validateRegistrationDetails (userId, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize)) {
+      utils.throwError('Missing or invalid fields')
     }
     
     if (existingRegistration.isAdminApproved === 0) {
@@ -156,8 +222,8 @@ module.exports = {
   },
 
 
-  async updateUnprocessedRegistration (userId, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize) {
-    await databaseFacade.execute(databaseFacade.queries.updateRegistrationDetails, [roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize, userId])
+  async updateUnprocessedRegistration (userId, roomPreference) {
+    await databaseFacade.execute(databaseFacade.queries.updateRegistrationOnlyRoomPreference, [roomPreference, userId])
     
     return {success: true}
   },
@@ -356,8 +422,8 @@ module.exports = {
   },
 
 
-  async rejectRegistration (userId, reason) {
-    await databaseFacade.execute(databaseFacade.queries.rejectRegistration, [reason, userId])
+  async rejectRegistration (userId) {
+    await databaseFacade.execute(databaseFacade.queries.rejectRegistration, [userId])
 
     return {success: true}
   },
@@ -384,12 +450,16 @@ module.exports = {
   },
 
 
+  isRoomPreferenceLegal (roomPreference) {
+    return roomPreference !== undefined && ['insideonly', 'insidepreference', 'outsideonly'].includes(roomPreference.toLowerCase())
+  },
+
+
   validateRegistrationDetails (userId, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize) {
-    let isRoomPreferenceLegal = ['insideonly', 'insidepreference', 'outsideonly'].includes(roomPreference.toLowerCase())
     let areFieldsOk = utils.areFieldsDefinedAndNotNull(userId, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie)
     let areMerchSizesOk = this.areMerchAndSizesValid(buyHoodie, hoodieSize, buyTshirt, tshirtSize)
 
-    return isRoomPreferenceLegal && areFieldsOk && areMerchSizesOk
+    return this.isRoomPreferenceLegal(roomPreference) && areFieldsOk && areMerchSizesOk
   },
 
 
@@ -478,4 +548,8 @@ module.exports = {
 
     return numbers
   },
+
+  parseRegistrationBooleans (registration) {
+    utils.convertIntsToBoolean(registration, 'earlyArrival', 'lateDeparture', 'buyTshirt', 'buyHoodie', 'needsManualPaymentDeadline', 'isAdminApproved', 'receivedInsideSpot', 'receivedOutsideSpot', 'isMainDaysInsidePaid', 'isMainDaysOutsidePaid', 'isEarlyArrivalPaid', 'isLateDeparturePaid', 'isHoodiePaid', 'isTshirtPaid', 'isMainDaysPaid', 'isAddonsPaid')
+  }
 }

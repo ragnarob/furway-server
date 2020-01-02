@@ -24,9 +24,12 @@ require('./api/user-api').setupRoutes()
 require('./api/admin-api').setupRoutes()
 require('./api/registration-api').setupRoutes()
 require('./api/auth-api').setupRoutes()
+require('./api/con-api').setupRoutes()
 
 const errorHandler = require('./utils/error-handler')
 app.use(errorHandler)
 
-app.listen('8088')
-console.log('listening on port 8088')
+app.get('*', (req, res) => res.sendFile('index.html', {root: './public'}))
+
+app.listen(process.env.PORT || 8088)
+console.log('listening on port ' + process.env.PORT || 8088)

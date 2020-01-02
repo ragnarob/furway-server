@@ -30,5 +30,16 @@ module.exports = {
     }
 
     return true
-  }
+  },
+
+  convertIntsToBoolean (object, ...keyNames) {
+    for (var key of keyNames) {
+      if (object[key] === 0) {
+        object[key] = false
+      }
+      else if (object[key] === 1) {
+        object[key] = true
+      }
+    }
+  },
 }
