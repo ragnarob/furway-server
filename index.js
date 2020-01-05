@@ -31,5 +31,6 @@ app.use(errorHandler)
 
 app.get('*', (req, res) => res.sendFile('index.html', {root: './public'}))
 
-app.listen(process.env.PORT || 8088)
-console.log('listening on port ' + process.env.PORT || 8088)
+const port = process.env.PORT || 8088
+app.listen(port)
+console.log('listening on port ' + port)

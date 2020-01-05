@@ -94,6 +94,9 @@ module.exports = {
 
   async getAllUsers () {
     let users = await databaseFacade.execute(databaseFacade.queries.getAllUsers)
+    for (var user of users) {
+      this.parseUserBooleans(user)
+    }
     return users
   },
 
@@ -144,4 +147,8 @@ module.exports = {
     textContent[contentId] = newContent
     await fileSystemFacade.writeFile(path.join(__dirname, '../static/text-content.json'), JSON.stringify(textContent))
   },
+
+  parseUserBooleans (user) {
+    utils.convertIntsToBoolean(user, 'isVegan', 'isFursuiter', 'isVolunteer', 'isAdmin')
+  }
 }
