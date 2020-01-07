@@ -24,7 +24,8 @@ module.exports = {
   },
 
   async getConInfo () {
-    let conInfo = require('../config/con-info.json')
+    let conInfo = await fileSystemFacade.readFile(path.join(__dirname, '../config/con-info.json'))
+    conInfo = JSON.parse(conInfo)
 
     return conInfo
   },
