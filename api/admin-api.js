@@ -24,7 +24,7 @@ module.exports = {
 
     app.get('/api/waitinglist', authApi.authorizeAdminUser, async (req, res, throwErr) => {
       let response = await handle(res, throwErr,
-        this.getWaitingLists.bind(this))
+        registrationApi.getWaitingLists)
       res.json(response)
     })
 
@@ -98,39 +98,6 @@ module.exports = {
       this.parseUserBooleans(user)
     }
     return users
-  },
-
-  async getWaitingLists () {
-    let registrationsInWaitingList = await databaseFacade.execute(databaseFacade.queries.getWaitingListRegistrations)
-    let waitingLists = {'inside': [], 'outside': []}
-    let insideCounter = outsideCounter = 1
-    for (let reg of registrationsInWaitingList) {
-      if (reg['roomPreference'] === 'insideonly') {
-        reg.insideWaitingListNumber = insideCounter
-        waitingLists.inside.push(reg)
-        insideCounter++
-      }
-
-      else if (reg['roomPreference'] === 'outsideonly') {
-        reg.outsideWaitingListNumber = outsideCounter
-        waitingLists.outside.push(reg)
-        outsideCounter++
-      }
-
-      else if (reg['roomPreference'] === 'insidepreference') {
-        reg.insideWaitingListNumber = insideCounter
-        waitingLists.inside.push(reg)
-        insideCounter++
-
-        if (reg['receivedOutsideSpot'] === 0) {
-          reg.outsideWaitingListNumber = outsideCounter
-          waitingLists.outside.push(reg)
-          outsideCounter++
-        }
-      }
-    }
-
-    return waitingLists
   },
 
   async getPendingRegistrations () {

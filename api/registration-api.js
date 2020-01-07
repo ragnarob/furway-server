@@ -110,7 +110,16 @@ module.exports = {
     registrationData.isMainDaysPaid = this.isMainDaysPaid(registrationData)
     registrationData.isAddonsPaid = this.isAddonsPaid(registrationData)
     this.parseRegistrationBooleans(registrationData)
-    console.log(registrationData)
+
+    if (this.isRegistrationInWaitingList(registrationData)) {
+      let wantsInsideRoom = registrationData['roomPreference'] === 'insideonly' || registrationData['roomPreference'] === 'insidepreference'
+      let wantsOutsideRoom = registrationData['roomPreference'] === 'outsideonly' || registrationData['roomPreference'] === 'insidepreference'
+      let receivedOutsideSpot = registrationData['receivedOutsideSpot'] === true
+      registrationData.waitingListPositions = this.getWaitingListPositionsByRegistrationId(registrationData.id, wantsInsideRoom, wantsOutsideRoom, receivedOutsideSpot)
+    }
+    else {
+      registrationData.waitingListPositions = {inside: null, outside: null}
+    }
 
     return registrationData
   },
@@ -127,6 +136,17 @@ module.exports = {
            && registration.buyTshirt ? registration.isTshirtPaid : true
            && registration.earlyArrival ? registration.isEarlyArrivalPaid : true
            && registration.lateDeparture ? registration.isLateDeparturePaid : true 
+  },
+
+
+  isRegistrationInWaitingList (registrationData) {
+    if (registrationData['receivedInsideSpot'] === true) {
+      return false
+    }
+    if (registrationData['roomPreference'] === 'outsideonly' && registrationData['receivedOutsideSpot'] === true) {
+      return false
+    }
+    return true
   },
 
 
@@ -475,6 +495,72 @@ module.exports = {
       }
     }
     return true
+  },
+
+
+  async getWaitingListPositionsByRegistrationId (registrationId, wantsInsideRoom, wantsOutsideRoom, receivedOutsideSpot) {
+    let registrationsInWaitingList = await databaseFacade.execute(databaseFacade.queries.getWaitingListRegistrations)
+    let waitingListPositions = {inside: null, outside: null}
+    let insideCounter = outsideCounter = 1
+    for (let reg of registrationsInWaitingList) {
+      console.log(reg['id'], registrationId)
+      if (reg['id'] === registrationId) {
+        if (wantsInsideRoom) {
+          waitingListPositions.inside = insideCounter
+        }
+        if (!receivedOutsideSpot && wantsOutsideRoom) {
+          waitingListPositions.outside = outsideCounter
+        }
+        return waitingListPositions
+      }
+
+      else {
+        if (reg['roomPreference'] === 'insideonly') {
+          insideCounter++
+        }
+        else if (reg['roomPreference'] === 'outsideonly') {
+          outsideCounter++
+        }
+        else {
+          insideCounter++
+          outsideCounter++
+        }
+      }
+    }
+  },
+
+  
+  async getWaitingLists () {
+    let registrationsInWaitingList = await databaseFacade.execute(databaseFacade.queries.getWaitingListRegistrations)
+    let waitingLists = {'inside': [], 'outside': []}
+    let insideCounter = outsideCounter = 1
+    for (let reg of registrationsInWaitingList) {
+      if (reg['roomPreference'] === 'insideonly') {
+        reg.insideWaitingListNumber = insideCounter
+        waitingLists.inside.push(reg)
+        insideCounter++
+      }
+
+      else if (reg['roomPreference'] === 'outsideonly') {
+        reg.outsideWaitingListNumber = outsideCounter
+        waitingLists.outside.push(reg)
+        outsideCounter++
+      }
+
+      else if (reg['roomPreference'] === 'insidepreference') {
+        reg.insideWaitingListNumber = insideCounter
+        waitingLists.inside.push(reg)
+        insideCounter++
+
+        if (reg['receivedOutsideSpot'] === 0) {
+          reg.outsideWaitingListNumber = outsideCounter
+          waitingLists.outside.push(reg)
+          outsideCounter++
+        }
+      }
+    }
+
+    return waitingLists
   },
 
 
