@@ -121,6 +121,10 @@ module.exports = {
       registrationData.waitingListPositions = {inside: null, outside: null}
     }
 
+    let amounts = this.getPaidAndUnpaidAmount(registrationData)
+    registrationData.paidAmount = amounts.paid
+    registrationData.unpaidAmount = amounts.unpaid
+
     return registrationData
   },
 
