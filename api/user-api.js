@@ -92,7 +92,7 @@ module.exports = {
   },
 
   async createUser (username, password1, password2, firstName, lastName, email, dateOfBirth, phone, isVegan, isFursuiter, allergiesText, addressLine1, addressLine2, addressCity, addressStateProvince, addressCountry, additionalInfo) {
-    if (!username || !password1 || !password2 || !firstName || !lastName || !email || !dateOfBirth || !phone || isVegan===undefined || isFursuiter===undefined || !addressLine1 || !addressCity || !addressCountry || !additionalInfo) {
+    if (!username || !password1 || !password2 || !firstName|| !password1 || !password2 || !firstName || !lastName || !email || !dateOfBirth || !phone || isVegan===undefined || isFursuiter===undefined || !addressLine1 || !addressCity || !addressCountry) {
       utils.throwError('Missing or invalid fields')
     }
     

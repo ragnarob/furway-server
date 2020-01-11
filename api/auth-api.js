@@ -150,7 +150,7 @@ const authMiddleware = module.exports = {
       utils.throwError('A user with this email already exists')
     }
 
-    if (!password1 === password2) {
+    if (password1 !== password2) {
       utils.throwError('Passwords don\'t match')
     }
     if (!utils.validatePassword(password1) || !utils.validateUsername(username)) {

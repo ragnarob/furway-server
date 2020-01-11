@@ -6,7 +6,7 @@ module.exports = {
   },
   
   validateUsername (username) {
-    return /^[a-zA-ZÆØÅæøå][\w\d_-ÆØÅæøå]{1,19}$/.test(username)
+    return /^[a-zA-ZÆØÅæøå][\w\d_-ÆØÅæøå]{2,20}$/.test(username)
   },
 
   validatePassword (password) {
