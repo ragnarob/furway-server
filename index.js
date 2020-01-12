@@ -6,16 +6,20 @@ app.use(bodyParser.json())
 app.use(bodyParser.urlencoded({extended: true}))
 
 let session = require('express-session')
-const redis = require('redis')
-const redisStore = require('connect-redis')(session)
-const redisClient = redis.createClient()
+const MysqlStore = require('express-mysql-session')(session)
+const dbOptions = require('./config/database-settings.json')
+dbOptions['dabatase'] = 'furwaydb-session'
+dbOptions['expiration'] = 86400 * 1000 * 60
+dbOptions['connectionLimit'] = 2
+const sessionStore = new MysqlStore(dbOptions)
+
 app.use(session({
   secret: 'de78asdta8dyasdhi2jadajadazuckerbergzuperc00l',
-  name: '_redisPractice',
+  key: 'furway_session',
   resave: false,
   saveUninitialized: true,
   cookie: { secure: false },
-  store: new redisStore({ host: 'localhost', port: 6379, client: redisClient, ttl: 86400 * 1000 * 60 }),
+  store: sessionStore,
 }));
 
 app.use(express.static('./public'))
