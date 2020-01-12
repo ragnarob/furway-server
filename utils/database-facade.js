@@ -51,7 +51,9 @@ const facade = module.exports = {
     addInsideSpotWithoutDeadlineToRegistrationAndRemoveOutsideSpot: `UPDATE registration SET receivedinsidespot = 1, receivedoutsidespot = 0, needsmanualpaymentdeadline = 1 WHERE userid = ?`,
 
     updateRoomPreference: `UPDATE registration SET roompreference = ? WHERE userid = ?`,
-    updateRoomPreferenceAndResetSpot: `UPDATE registration SET roompreference = ?, receivedinsidespot = 0, receivedoutsidespot = 0 WHERE userid = ?`
+    updateRoomPreferenceAndResetSpot: `UPDATE registration SET roompreference = ?, receivedinsidespot = 0, receivedoutsidespot = 0 WHERE userid = ?`,
+
+    logRoute: `INSERT INTO log (path) VALUES (?)`,
   },
 
   execute (queryStringOrName, queryParams) {

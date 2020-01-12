@@ -43,6 +43,11 @@ const authMiddleware = module.exports = {
       await handle(res, throwErr,
         this.handleForgottenPassword.bind(this), req.body.email)
     })
+
+    app.post('/api/log-route', async (req, res, throwErr) => {
+      await handle(res, throwErr,
+        this.logRoute.bind(this), req.body.route)
+    })
   },
   
   async login (req, usernameOrEmail, password) {
@@ -72,7 +77,11 @@ const authMiddleware = module.exports = {
     await databaseFacade.execute(updateUsernameQuery, updateUsernameQueryParams)
 
     userData.username = newUsername
-    req.session.user = userData
+    req.session.user = {
+      id: userData.id,
+      username: userData.username,
+      email: userData.email
+    }
 
     let fullUserData = await databaseFacade.execute(databaseFacade.queries.getUserById, [userData.id])
 
@@ -134,6 +143,14 @@ const authMiddleware = module.exports = {
     }
 
     return Object.assign({}, userResult)
+  },
+
+  async logRoute (route) {
+    if (!route) {
+      utils.throwError('Invalid route')
+    }
+
+    databaseFacade.execute(databaseFacade.queries.logRoute, [route])
   },
   
   async validateUserAndHashPassword (username, email, password1, password2) {

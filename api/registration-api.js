@@ -507,7 +507,6 @@ module.exports = {
     let waitingListPositions = {inside: null, outside: null}
     let insideCounter = outsideCounter = 1
     for (let reg of registrationsInWaitingList) {
-      console.log(reg['id'], registrationId)
       if (reg['id'] === registrationId) {
         if (wantsInsideRoom) {
           waitingListPositions.inside = insideCounter
