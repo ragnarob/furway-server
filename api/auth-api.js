@@ -151,6 +151,7 @@ const authMiddleware = module.exports = {
     }
 
     databaseFacade.execute(databaseFacade.queries.logRoute, [route])
+    res.json({success: true})
   },
   
   async validateUserAndHashPassword (username, email, password1, password2) {
