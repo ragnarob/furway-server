@@ -23,7 +23,7 @@ const authMiddleware = module.exports = {
 
     app.post('/logout', async (req, res, throwErr) => {
       this.logout()
-      res.json({success: true})
+      res.json({'success': true})
     })
 
     app.post('/changeusername', async (req, res, throwErr) => {
@@ -36,8 +36,8 @@ const authMiddleware = module.exports = {
     app.post('/changepassword', async (req, res, throwErr) => {
       await handle(res, throwErr,
         this.changePassword.bind(this), req.body.usernameOrEmail, req.body.password, req.body.newPassword1, req.body.newPassword2)
-      res.json({success: true})
-    })
+        res.json({'success': true})
+      })
 
     app.post('/forgottenpassword', async (req, res, throwErr) => {
       await handle(res, throwErr,
@@ -47,6 +47,7 @@ const authMiddleware = module.exports = {
     app.post('/api/log-route', async (req, res, throwErr) => {
       await handle(res, throwErr,
         this.logRoute.bind(this), req.body.route)
+      res.json({'success': true})
     })
   },
   
@@ -146,12 +147,9 @@ const authMiddleware = module.exports = {
   },
 
   async logRoute (route) {
-    if (!route) {
-      utils.throwError('Invalid route')
+    if (route) {
+      databaseFacade.execute(databaseFacade.queries.logRoute, [route])
     }
-
-    databaseFacade.execute(databaseFacade.queries.logRoute, [route])
-    res.json({success: true})
   },
   
   async validateUserAndHashPassword (username, email, password1, password2) {
