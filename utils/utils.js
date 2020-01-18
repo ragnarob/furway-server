@@ -31,6 +31,10 @@ module.exports = {
 
     return true
   },
+  
+  parseUserBooleans (user) {
+    return this.convertIntsToBoolean(user, 'isVegan', 'isFursuiter', 'isVolunteer', 'isAdmin')
+  },
 
   convertIntsToBoolean (object, ...keyNames) {
     for (var key of keyNames) {
@@ -41,5 +45,7 @@ module.exports = {
         object[key] = true
       }
     }
+
+    return object
   },
 }

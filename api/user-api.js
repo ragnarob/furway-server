@@ -22,7 +22,7 @@ module.exports = {
 
     app.post('/api/users', async (req, res, throwErr) => {
       let insertId = await handle(res, throwErr,
-        this.createUser.bind(this), req.body.username, req.body.password1, req.body.password2, req.body.firstName, req.body.lastName, req.body.email, req.body.dateOfBirth, req.body.phone, req.body.isVegan, req.body.isFursuiter, req.body.allergiesText, req.body.addressLine1, req.body.addressLine2, req.body.addressCity, req.body.addressStateProvince, req.body.addressCountry, req.body.additionalInfo)
+        this.createUser.bind(this), req.body.username, req.body.telegramUsername, req.body.password1, req.body.password2, req.body.firstName, req.body.lastName, req.body.email, req.body.dateOfBirth, req.body.phone, req.body.isVegan, req.body.isFursuiter, req.body.allergiesText, req.body.addressLine1, req.body.addressLine2, req.body.addressCity, req.body.addressStateProvince, req.body.addressCountry, req.body.pickupType, req.body.pickupTime, req.body.additionalInfo)
       await handle(req, throwErr,
         authApi.login.bind(authApi), req, req.body.username, req.body.password1)
 
@@ -39,7 +39,7 @@ module.exports = {
 
     app.post('/api/users/:id', async (req, res, throwErr) => {
       await handleAndAuthorize(req, res, throwErr, Number(req.params.id),
-        this.saveUser.bind(this), Number(req.params.id), req.body.username, req.body.firstName, req.body.lastName, req.body.email, req.body.dateOfBirth, req.body.phone, req.body.isVegan, req.body.isFursuiter, req.body.allergiesText, req.body.addressLine1, req.body.addressLine2, req.body.addressCity, req.body.addressStateProvince, req.body.addressCountry, req.body.additionalInfo)
+        this.saveUser.bind(this), Number(req.params.id), req.body.username, req.body.telegramUsername, req.body.firstName, req.body.lastName, req.body.email, req.body.dateOfBirth, req.body.phone, req.body.isVegan, req.body.isFursuiter, req.body.allergiesText, req.body.addressLine1, req.body.addressLine2, req.body.addressCity, req.body.addressStateProvince, req.body.addressCountry, req.body.pickupType, req.body.pickupTime, req.body.additionalInfo)
 
       let newUserData = await handle(res, throwErr,
         this.getUser.bind(this), Number(req.params.id))
@@ -64,17 +64,30 @@ module.exports = {
     if (userData.length === 0) {
       return {user: null}
     }
-    return userData[0]
+
+    userData = utils.parseUserBooleans(userData[0])
+
+    return userData
   },
 
-  async saveUser (userId, username, firstName, lastName, email, dateOfBirth, phone, isVegan, isFursuiter, allergiesText, addressLine1, addressLine2, addressCity, addressStateProvince, addressCountry, additionalInfo) {
+  async saveUser (userId, username, telegramUsername, firstName, lastName, email, dateOfBirth, phone, isVegan, isFursuiter, allergiesText, addressLine1, addressLine2, addressCity, addressStateProvince, addressCountry, pickupType, pickupTime, additionalInfo) {
+    // console.log (!userId, !username, !firstName, !lastName, !email, !dateOfBirth, !phone, !addressLine1, !addressCity, !addressCountry, !utils.validateUsername(username))
     if (!userId || !username || !firstName || !lastName || !email || !dateOfBirth || !phone || !addressLine1 || !addressCity || !addressCountry || !utils.validateUsername(username)) {
       utils.throwError('Missing or invalid fields')
     }
+    if (!utils.areFieldsDefinedAndNotNull(isFursuiter, isVegan)) {
+      utils.throwError('Missing or invalid fields')
+    }
 
-    let saveUserQuery = 'UPDATE user SET username=?, firstname=?, lastname=?, email=?, dateofbirth=?, phone=?, isvegan=?, isfursuiter=?, allergiestext=?, addressline1=?, addressline2=?, addresscity=?, addressstateprovince=?, addresscountry=?, additionalinfo=? WHERE id=?'
-    let saveUserQueryParams = [username, firstName, lastName, email, new Date(dateOfBirth), phone, isVegan, isFursuiter, allergiesText, addressLine1, addressLine2, addressCity, addressStateProvince, addressCountry, additionalInfo, userId]
-    await databaseFacade.execute(saveUserQuery, saveUserQueryParams)
+    if (pickupTime !== null && pickupType === null) {
+      pickupTime = null
+    }
+    if (pickupTime !== null && pickupType !== null) {
+      pickupTime = new Date(pickupTime)
+    }
+
+    let saveUserQueryParams = [username, telegramUsername, firstName, lastName, email, new Date(dateOfBirth), phone, isVegan, isFursuiter, allergiesText, addressLine1, addressLine2, addressCity, addressStateProvince, addressCountry, pickupType, pickupTime, additionalInfo, userId]
+    await databaseFacade.execute(databaseFacade.queries.saveUser, saveUserQueryParams)
 
     return {success: true}
   },
