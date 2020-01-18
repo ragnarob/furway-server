@@ -22,7 +22,7 @@ const authMiddleware = module.exports = {
     })
 
     app.post('/logout', async (req, res, throwErr) => {
-      this.logout()
+      this.logout(req)
       res.json({'success': true})
     })
 
@@ -59,11 +59,11 @@ const authMiddleware = module.exports = {
     req.session.user = userData
 
     let fullUserData = await databaseFacade.execute(databaseFacade.queries.getUserById, [userData.id])
-
-    return fullUserData[0]
+    fullUserData = utils.parseUserBooleans(fullUserData[0])
+    return fullUserData
   },
   
-  logout () {
+  logout (req) {
     req.session.destroy()
   },
 
