@@ -109,7 +109,7 @@ module.exports = {
 
   validateUserFields (username, firstName, lastName, email, dateOfBirth, phone, isVegan, isFursuiter, addressLine1, addressCity, addressCountry) {
     let fields = [username, firstName, lastName, email, dateOfBirth, phone, addressLine1, addressCity, addressCountry]
-    let fieldNames = ['user id', 'username', 'first name', 'last name', 'email', 'date of birth', 'phone', 'address line 1', 'address city', 'address country']
+    let fieldNames = ['username', 'first name', 'last name', 'email', 'date of birth', 'phone', 'address line 1', 'zip code and area', 'address country']
     for (let i=0; i<fields.length; i++) {
       if (!fields[i]) {
         utils.throwError(`Missing or invalid fields (${fieldNames[i]})`)
