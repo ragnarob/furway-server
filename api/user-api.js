@@ -53,6 +53,13 @@ module.exports = {
 
       res.json(response)
     })
+
+    app.post('/api/users/:id/delete', async (req, res, throwErr) => {
+      let response = await handleAndAuthorize(req, res, throwErr, Number(req.params.id),
+        this.deleteUser.bind(this), Number(req.params.id))
+
+      res.json(response)
+    })
   },
 
   async getUserFromSession (req) {
@@ -78,7 +85,7 @@ module.exports = {
   },
 
   async saveUser (userId, username, telegramUsername, firstName, lastName, email, dateOfBirth, phone, isVegan, isFursuiter, allergiesText, addressLine1, addressLine2, addressCity, addressStateProvince, addressCountry, pickupType, pickupTime, additionalInfo) {
-    this.validateUserFields(userId, username, firstName, lastName, email, dateOfBirth, phone, isVegan, isFursuiter, addressLine1, addressCity, addressCountry)
+    this.validateUserFields(username, firstName, lastName, email, dateOfBirth, phone, isVegan, isFursuiter, addressLine1, addressCity, addressCountry)
 
     pickupTime = this.fixPickupTime(pickupType, pickupTime)
 
@@ -89,7 +96,7 @@ module.exports = {
   },
 
   async saveUserAsAdmin (userId, username, telegramUsername, firstName, lastName, email, dateOfBirth, phone, isVegan, isFursuiter, allergiesText, addressLine1, addressLine2, addressCity, addressStateProvince, addressCountry, pickupType, pickupTime, isVolunteer, isDriver, isAdmin, additionalInfo) {
-    this.validateUserFields(userId, username, firstName, lastName, email, dateOfBirth, phone, isVegan, isFursuiter, addressLine1, addressCity, addressCountry)
+    this.validateUserFields(username, firstName, lastName, email, dateOfBirth, phone, isVegan, isFursuiter, addressLine1, addressCity, addressCountry)
     this.validateUserAdminFields(isVolunteer, isDriver, isAdmin)
 
     pickupTime = this.fixPickupTime(pickupType, pickupTime)
@@ -100,8 +107,8 @@ module.exports = {
     return {success: true}
   },
 
-  validateUserFields (userId, username, firstName, lastName, email, dateOfBirth, phone, isVegan, isFursuiter, addressLine1, addressCity, addressCountry) {
-    let fields = [userId, username, firstName, lastName, email, dateOfBirth, phone, addressLine1, addressCity, addressCountry]
+  validateUserFields (username, firstName, lastName, email, dateOfBirth, phone, isVegan, isFursuiter, addressLine1, addressCity, addressCountry) {
+    let fields = [username, firstName, lastName, email, dateOfBirth, phone, addressLine1, addressCity, addressCountry]
     let fieldNames = ['user id', 'username', 'first name', 'last name', 'email', 'date of birth', 'phone', 'address line 1', 'address city', 'address country']
     for (let i=0; i<fields.length; i++) {
       if (!fields[i]) {
@@ -141,6 +148,17 @@ module.exports = {
     }
   },
 
+  async deleteUser (userId) {
+    let user = await this.getUser(userId)
+    if (user.registrationId !== null) {
+      utils.throwError('User has a registration which must be deleted first')
+    }
+
+    await databaseFacade.execute(databaseFacade.queries.deleteUser, [userId])
+
+    return {'success': true}
+  },
+
   async authorizeUserOrAdmin (req, userId) {
     let user = utils.getUserFromSession(req)
     if (user && user.id === userId) {
@@ -153,10 +171,8 @@ module.exports = {
     }
   },
 
-  async createUser (username, password1, password2, firstName, lastName, email, dateOfBirth, phone, isVegan, isFursuiter, allergiesText, addressLine1, addressLine2, addressCity, addressStateProvince, addressCountry, additionalInfo) {
-    if (!username || !password1 || !password2 || !firstName|| !password1 || !password2 || !firstName || !lastName || !email || !dateOfBirth || !phone || isVegan===undefined || isFursuiter===undefined || !addressLine1 || !addressCity || !addressCountry) {
-      utils.throwError('Missing or invalid fields')
-    }
+  async createUser (username, telegramUsername, password1, password2, firstName, lastName, email, dateOfBirth, phone, isVegan, isFursuiter, allergiesText, addressLine1, addressLine2, addressCity, addressStateProvince, addressCountry, additionalInfo) {
+    this.validateUserFields(username, firstName, lastName, email, dateOfBirth, phone, isVegan, isFursuiter, addressLine1, addressCity, addressCountry)
     
     let hashedPassword = await authApi.validateUserAndHashPassword(username, email, password1, password2)
 
