@@ -29,7 +29,7 @@ const facade = module.exports = {
 
     updateRegistrationOnlyRoomPreference: 'UPDATE registration SET roompreference=? WHERE userid=?',
 
-    updateRegistrationDetails: 'UPDATE registration SET roompreference=?, earlyarrival=?, latedeparture=?, buytshirt=?, buyhoodie=?, tshirtsize=?, hoodiesize=? WHERE userid=?',
+    updateRegistrationAddons: 'UPDATE registration SET earlyarrival=?, latedeparture=?, buytshirt=?, buyhoodie=?, tshirtsize=?, hoodiesize=? WHERE userid=?',
 
     updateRejectedRegistrationDetails: 'UPDATE registration SET roompreference=?, earlyarrival=?, latedeparture=?, buytshirt=?, buyhoodie=?, tshirtsize=?, hoodiesize=?, timestamp=NOW(), adminrejectedreason = NULL WHERE userid=?',
 

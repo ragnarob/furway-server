@@ -157,8 +157,10 @@ module.exports = {
   getPaidAndUnpaidAmount (registration) {
     let unpaidAmount = 0
     let paidAmount = 0
-    if (this.isMainDaysPaid(registration)) { paidAmount += conInfo.mainDaysPriceNok }
-    else { unpaidAmount += conInfo.mainDaysPriceNok }
+
+    let mainDaysPrice = registration.receivedInsideSpot === true ? conInfo.mainDaysInsidePriceNok : conInfo.mainDaysOutsidePriceNok
+    if (this.isMainDaysPaid(registration)) {paidAmount += mainDaysPrice }
+    else { unpaidAmount += mainDaysPrice }
 
     if (registration.earlyArrival) {
       if (registration.isEarlyArrivalPaid) { paidAmount += conInfo.earlyArrivalPriceNok }
@@ -234,15 +236,15 @@ module.exports = {
       utils.throwError('Missing or invalid fields')
     }
     
-    if (existingRegistration.isAdminApproved === 0) {
+    if (existingRegistration.isAdminApproved === false) {
       return await this.updateRejectedRegistration(roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize)
     }
 
-    if (existingRegistration.isAdminApproved === 1) {
+    if (existingRegistration.isAdminApproved === true) {
       return await this.updateApprovedRegistration(existingRegistration, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize)
     }
 
-    return {success: true}
+    return {'error': 'Server error: Found nothing to update'}
   },
 
 
@@ -264,8 +266,12 @@ module.exports = {
     if (roomPreference !== existingRegistration.roomPreference) {
       await this.updateRoomPreference(existingRegistration, roomPreference)
     }
+    
+    await this.updateRegistrationAddons(existingRegistration, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize)
 
-    await this.moveRegistrationsFromWaitingListIfPossible()
+    this.moveRegistrationsFromWaitingListIfPossible()
+
+    return {'success': true}
   },
 
 
@@ -294,6 +300,17 @@ module.exports = {
     }
   },
 
+  async updateRegistrationAddons (existingRegistration, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize) {
+    if ((buyTshirt && !tshirtSize) || (buyHoodie && !hoodieSize)) {
+      utils.throwError('Missing merch size')
+    }
+
+    let updateRegistrationParams = [earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize, existingRegistration.userId]
+    await databaseFacade.execute(databaseFacade.queries.updateRegistrationAddons, updateRegistrationParams)
+
+    return {success: true}
+  },
+
   addToOtherQueue: async (newRoomPref, userId) => await databaseFacade.execute(databaseFacade.queries.updateRoomPreference, [newRoomPref, userId]),
   addToInsidePreferenceQueue: async userId => await databaseFacade.execute(databaseFacade.queries.updateRoomPreference, ['insidepreference', userId]),
   removeCurrentSpotAndAddToOtherQueue: async (newRoomPref, userId) => await databaseFacade.execute(databaseFacade.queries.updateRoomPreferenceAndResetSpot, [newRoomPref, userId]),
@@ -303,13 +320,6 @@ module.exports = {
     await databaseFacade.execute(databaseFacade.queries.deleteRegistration, [userId])
 
     return {success: true}
-  },
-
-
-  async updateUnpaidRegistration (userId, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize) {
-    await databaseFacade.execute(databaseFacade.queries.updateRegistrationDetails(userId, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize))
-    
-    return {success: wtrue}
   },
 
 
