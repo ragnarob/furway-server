@@ -33,7 +33,7 @@ module.exports = {
   },
   
   parseUserBooleans (user) {
-    return this.convertIntsToBoolean(user, 'isVegan', 'isFursuiter', 'isVolunteer', 'isAdmin')
+    return this.convertIntsToBoolean(user, 'isVegan', 'isFursuiter', 'isVolunteer', 'isDriver', 'isAdmin')
   },
 
   convertIntsToBoolean (object, ...keyNames) {

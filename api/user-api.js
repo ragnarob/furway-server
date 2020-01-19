@@ -46,6 +46,13 @@ module.exports = {
 
       res.json(newUserData)
     })
+
+    app.post('/api/users/:id/as-admin', async (req, res, throwErr) => {
+      let response = await handleAndAuthorize(req, res, throwErr, Number(req.params.id),
+        this.saveUserAsAdmin.bind(this), Number(req.params.id), req.body.username, req.body.telegramUsername, req.body.firstName, req.body.lastName, req.body.email, req.body.dateOfBirth, req.body.phone, req.body.isVegan, req.body.isFursuiter, req.body.allergiesText, req.body.addressLine1, req.body.addressLine2, req.body.addressCity, req.body.addressStateProvince, req.body.addressCountry, req.body.pickupType, req.body.pickupTime, req.body.isVolunteer, req.body.isDriver, req.body.isAdmin, req.body.additionalInfo)
+
+      res.json(response)
+    })
   },
 
   async getUserFromSession (req) {
@@ -71,25 +78,67 @@ module.exports = {
   },
 
   async saveUser (userId, username, telegramUsername, firstName, lastName, email, dateOfBirth, phone, isVegan, isFursuiter, allergiesText, addressLine1, addressLine2, addressCity, addressStateProvince, addressCountry, pickupType, pickupTime, additionalInfo) {
-    // console.log (!userId, !username, !firstName, !lastName, !email, !dateOfBirth, !phone, !addressLine1, !addressCity, !addressCountry, !utils.validateUsername(username))
-    if (!userId || !username || !firstName || !lastName || !email || !dateOfBirth || !phone || !addressLine1 || !addressCity || !addressCountry || !utils.validateUsername(username)) {
-      utils.throwError('Missing or invalid fields')
-    }
-    if (!utils.areFieldsDefinedAndNotNull(isFursuiter, isVegan)) {
-      utils.throwError('Missing or invalid fields')
-    }
+    this.validateUserFields(userId, username, firstName, lastName, email, dateOfBirth, phone, isVegan, isFursuiter, addressLine1, addressCity, addressCountry)
 
-    if (pickupTime !== null && pickupType === null) {
-      pickupTime = null
-    }
-    if (pickupTime !== null && pickupType !== null) {
-      pickupTime = new Date(pickupTime)
-    }
+    pickupTime = this.fixPickupTime(pickupType, pickupTime)
 
     let saveUserQueryParams = [username, telegramUsername, firstName, lastName, email, new Date(dateOfBirth), phone, isVegan, isFursuiter, allergiesText, addressLine1, addressLine2, addressCity, addressStateProvince, addressCountry, pickupType, pickupTime, additionalInfo, userId]
     await databaseFacade.execute(databaseFacade.queries.saveUser, saveUserQueryParams)
 
     return {success: true}
+  },
+
+  async saveUserAsAdmin (userId, username, telegramUsername, firstName, lastName, email, dateOfBirth, phone, isVegan, isFursuiter, allergiesText, addressLine1, addressLine2, addressCity, addressStateProvince, addressCountry, pickupType, pickupTime, isVolunteer, isDriver, isAdmin, additionalInfo) {
+    this.validateUserFields(userId, username, firstName, lastName, email, dateOfBirth, phone, isVegan, isFursuiter, addressLine1, addressCity, addressCountry)
+    this.validateUserAdminFields(isVolunteer, isDriver, isAdmin)
+
+    pickupTime = this.fixPickupTime(pickupType, pickupTime)
+
+    let saveUserQueryParams = [username, telegramUsername, firstName, lastName, email, new Date(dateOfBirth), phone, isVegan, isFursuiter, allergiesText, addressLine1, addressLine2, addressCity, addressStateProvince, addressCountry, pickupType, pickupTime, additionalInfo, isVolunteer, isDriver, isAdmin, userId]
+    await databaseFacade.execute(databaseFacade.queries.saveUserAsAdmin, saveUserQueryParams)
+
+    return {success: true}
+  },
+
+  validateUserFields (userId, username, firstName, lastName, email, dateOfBirth, phone, isVegan, isFursuiter, addressLine1, addressCity, addressCountry) {
+    let fields = [userId, username, firstName, lastName, email, dateOfBirth, phone, addressLine1, addressCity, addressCountry]
+    let fieldNames = ['user id', 'username', 'first name', 'last name', 'email', 'date of birth', 'phone', 'address line 1', 'address city', 'address country']
+    for (let i=0; i<fields.length; i++) {
+      if (!fields[i]) {
+        utils.throwError(`Missing or invalid fields (${fieldNames[i]})`)
+      }
+    }
+
+    let booleanFields = [isFursuiter, isVegan]
+    let booleanFieldNames = ['fursuiter, vegan']
+    for (let i=0; i<booleanFields.length; i++) {
+      if (booleanFields[i] === null || booleanFields[i] === undefined) {
+        utils.throwError(`Missing or invalid fields (${booleanFieldNames[i]})`)
+      }
+    }
+    
+    if (!utils.validateUsername(username)) {
+      utils.throwError(`Missing or invalid fields (username)`)
+    }
+  },
+
+  validateUserAdminFields (isVolunteer, isDriver, isAdmin) {
+    let booleanFields = [isVolunteer, isDriver, isAdmin]
+    let booleanFieldNames = ['volunteer', 'driver', 'admin']
+    for (let i=0; i<booleanFields.length; i++) {
+      if (booleanFields[i] === null || booleanFields[i] === undefined) {
+        utils.throwError(`Missing or invalid fields (${booleanFieldNames[i]})`)
+      }
+    }
+  },
+
+  fixPickupTime (pickupType, pickupTime) {
+    if (pickupTime !== null && pickupType === null) {
+      return null
+    }
+    if (pickupTime !== null && pickupType !== null) {
+      return new Date(pickupTime)
+    }
   },
 
   async authorizeUserOrAdmin (req, userId) {
@@ -126,3 +175,5 @@ module.exports = {
     return {success: true}
   },
 }
+
+const varToString = varObj => Object.keys(varObj)[0]
