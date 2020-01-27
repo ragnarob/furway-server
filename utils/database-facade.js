@@ -1,6 +1,8 @@
 const mysql = require('mysql')
 const databaseSettings = require('../config/database-settings.json')
 
+const getRegistrationsBase = 'SELECT registration.id AS id, user.username AS username, user.firstname as firstName, user.lastname as lastName, userid AS userId, roompreference AS roomPreference, earlyarrival AS earlyArrival, latedeparture AS lateDeparture, buytshirt AS buyTshirt, buyhoodie AS buyHoodie, tshirtsize AS tshirtSize, hoodiesize AS hoodieSize, timestamp AS timestamp, paymentdeadline AS paymentDeadline, needsmanualpaymentdeadline AS needsManualPaymentDeadline, isadminapproved AS isAdminApproved, receivedinsidespot AS receivedInsideSpot, receivedoutsidespot AS receivedOutsideSpot, adminrejectedreason as adminRejectedReason, ismaindaysinsidepaid AS isMainDaysInsidePaid, ismaindaysoutsidepaid AS isMainDaysOutsidePaid, isearlyarrivalpaid AS isEarlyArrivalPaid, islatedeparturepaid AS isLateDeparturePaid, ishoodiepaid AS isHoodiePaid, istshirtpaid AS isTshirtPaid FROM XXX INNER JOIN user ON (registration.userid = user.id) ORDER BY timestamp ASC'
+
 const facade = module.exports = {
   mysqlPool: mysql.createPool(databaseSettings),
 
@@ -15,7 +17,11 @@ const facade = module.exports = {
 
     deleteUser: 'DELETE FROM user WHERE id=?',
 
-    getAllRegistrations: 'SELECT registration.id AS id, user.username AS username, user.firstname as firstName, user.lastname as lastName, userid AS userId, roompreference AS roomPreference, earlyarrival AS earlyArrival, latedeparture AS lateDeparture, buytshirt AS buyTshirt, buyhoodie AS buyHoodie, tshirtsize AS tshirtSize, hoodiesize AS hoodieSize, timestamp AS timestamp, paymentdeadline AS paymentDeadline, needsmanualpaymentdeadline AS needsManualPaymentDeadline, isadminapproved AS isAdminApproved, receivedinsidespot AS receivedInsideSpot, receivedoutsidespot AS receivedOutsideSpot, adminrejectedreason as adminRejectedReason, ismaindaysinsidepaid AS isMainDaysInsidePaid, ismaindaysoutsidepaid AS isMainDaysOutsidePaid, isearlyarrivalpaid AS isEarlyArrivalPaid, islatedeparturepaid AS isLateDeparturePaid, ishoodiepaid AS isHoodiePaid, istshirtpaid AS isTshirtPaid FROM registration INNER JOIN user ON (registration.userid = user.id) ORDER BY timestamp ASC',
+    getAllRegistrations: getRegistrationsBase.replace('XXX', 'registration'),
+
+    getDeletedRegistrations: getRegistrationsBase
+      .replace(/registration./g, 'cancelledregistration.')
+      .replace('XXX', 'cancelledregistration'),
 
     getRegistration: 'SELECT registration.id AS id, userid AS userId, roompreference AS roomPreference, earlyarrival AS earlyArrival, latedeparture AS lateDeparture, buytshirt AS buyTshirt, buyhoodie AS buyHoodie, tshirtsize AS tshirtSize, hoodiesize AS hoodieSize, timestamp AS timestamp, paymentdeadline AS paymentDeadline, needsmanualpaymentdeadline AS needsManualPaymentDeadline, isadminapproved AS isAdminApproved, receivedinsidespot AS receivedInsideSpot, receivedoutsidespot AS receivedOutsideSpot, adminrejectedreason AS adminRejectedReason, ismaindaysinsidepaid AS isMainDaysInsidePaid, ismaindaysoutsidepaid AS isMainDaysOutsidePaid, isearlyarrivalpaid AS isEarlyArrivalPaid, islatedeparturepaid AS isLateDeparturePaid, ishoodiepaid AS isHoodiePaid, istshirtpaid AS isTshirtPaid FROM registration WHERE userId = ?',
 
@@ -26,6 +32,8 @@ const facade = module.exports = {
     addRegistration: 'INSERT INTO registration (userid, roompreference) VALUES (?, ?)',
 
     deleteRegistration: 'DELETE FROM registration WHERE userid = ?',
+
+    saveCancelledRegistration: 'INSERT INTO cancelledregistration (userid, roompreference, earlyarrival, latedeparture, buytshirt, buyhoodie, tshirtsize, hoodiesize, timestamp, paymentdeadline, needsmanualpaymentdeadline, isadminapproved, receivedinsidespot, receivedoutsidespot, ismaindaysinsidePaid, ismaindaysoutsidepaid, isearlyarrivalpaid, islatedeparturepaid, ishoodiepaid, istshirtpaid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
 
     updateRegistrationOnlyRoomPreference: 'UPDATE registration SET roompreference=? WHERE userid=?',
 
@@ -40,8 +48,6 @@ const facade = module.exports = {
     rejectRegistration: 'UPDATE registration SET isadminapproved = 0 WHERE userid = ?',
 
     removeSpotFromRegistration: 'UPDATE registration SET receivedinsidespot = 0, receivedoutsidespot = 0, isadminapproved = 0, timestamp = NOW() WHERE userid = ?',
-
-    deleteRegistration: 'DELETE FROM registration WHERE userid = ?',
 
     getFirstRegistrationUserIdInWaitingListInside: `SELECT userid FROM registration WHERE receivedinsidespot=0 AND (roompreference='insideonly' OR roompreference='insidepreference') AND isadminapproved=1 AND ismaindaysinsidepaid=0 ORDER BY timestamp ASC LIMIT 1`,
 

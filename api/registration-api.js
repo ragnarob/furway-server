@@ -16,6 +16,12 @@ module.exports = {
       res.json(response)
     })
 
+    app.get('/api/registrations/deleted', authApi.authorizeAdminUser, async (req, res, throwErr) => {
+      let response = await handle(res, throwErr,
+        this.getDeletedRegistrations.bind(this))
+      res.json(response)
+    })
+
     app.get('/api/registrations/pending', authApi.authorizeAdminUser, async (req, res, throwErr) => {
       let allRegistrations = await handle(res, throwErr,
         this.getAllRegistrations.bind(this))
@@ -77,8 +83,22 @@ module.exports = {
 
 
   async getAllRegistrations () {
-    let allRegistrations = await databaseFacade.execute(databaseFacade.queries.getAllRegistrations)
-    
+    return await this.getRegistrations(false)
+  },
+
+
+  async getDeletedRegistrations () {
+    return await this.getRegistrations(true)
+  },
+
+
+  async getRegistrations (getCancelledRegistrations) {
+if (getCancelledRegistrations) {
+  console.log(getCancelledRegistrations ? databaseFacade.queries.getDeletedRegistrations : databaseFacade.queries.getAllRegistrations)
+}
+    let allRegistrations = await databaseFacade.execute(getCancelledRegistrations ? databaseFacade.queries.getDeletedRegistrations : databaseFacade.queries.getAllRegistrations)
+// console.log(getCancelledRegistrations ? databaseFacade.queries.getDeletedRegistrations : databaseFacade.queries.getAllRegistrations)
+console.log(getCancelledRegistrations)
     for (let registration of allRegistrations) {
       registration.isMainDaysPaid = this.isMainDaysPaid(registration)
       registration.isAddonsPaid = this.isAddonsPaid(registration)
@@ -317,6 +337,12 @@ module.exports = {
 
 
   async deleteRegistration (userId) {
+    let registrationData = await this.getRegistrationByUserId(userId)
+
+    let saveCancelledRegQueryParams = [userId, registrationData.roomPreference, registrationData.earlyArrival, registrationData.lateDeparture, registrationData.buyTshirt, registrationData.buyHoodie, registrationData.tshirtSize, registrationData.hoodieSize, registrationData.timestamp, registrationData.paymentDeadline, registrationData.needsManualPaymentDeadline, registrationData.isAdminApproved, registrationData.receivedInsideSpot, registrationData.receivedOutsideSpot, registrationData.isMainDaysInsidePaid, registrationData.isMainDaysOutsidePaid, registrationData.isEarlyArrivalPaid, registrationData.isLateDeparturePaid, registrationData.isHoodiePaid, registrationData.isTshirtPaid]
+
+    await databaseFacade.execute(databaseFacade.queries.saveCancelledRegistration, saveCancelledRegQueryParams)
+
     await databaseFacade.execute(databaseFacade.queries.deleteRegistration, [userId])
 
     return {success: true}
