@@ -178,20 +178,27 @@ const authMiddleware = module.exports = {
   },
   
   async authorizeAdminUser (req, res, next) {
-    return await authMiddleware.authorizeUser(req, res, next, 'isadmin')
+    return await authMiddleware.authorizeUser(req, res, next, ['isadmin'])
   },
 
   async authorizeVolunteerUser (req, res, next) {
-    return await authMiddleware.authorizeUser(req, res, next, 'isvolunteer')
+    return await authMiddleware.authorizeUser(req, res, next, ['isvolunteer'])
   },
 
-  async authorizeUser (req, res, next, userType) {
+  async authorizeDriverUser (req, res, next) {
+    return await authMiddleware.authorizeUser(req, res, next, ['isadmin', 'isdriver'])
+  },
+
+  async authorizeUser (req, res, next, userRoles) {
     let authorized = false
     if (req.session && req.session.user) {
-      let query = `SELECT * FROM user WHERE id=? AND ${userType}=1`
-      let queryParams = req.session.user.id
-      let result = await databaseFacade.execute(query, queryParams)
-      authorized = result.length > 0
+      for (let userRole of userRoles) {
+        let query = `SELECT * FROM user WHERE id=? AND ${userRole}=1`
+        let queryParams = req.session.user.id
+        let result = await databaseFacade.execute(query, queryParams)
+
+        authorized = authorized || result.length > 0
+      }
     }
 
     if (authorized) {

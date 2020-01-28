@@ -71,14 +71,6 @@ module.exports = {
         this.rejectRegistration.bind(this), Number(req.params.userId));
       res.json(response)
     })
-    
-    app.post('/api/registrations/user/:userId/removespot', authApi.authorizeAdminUser, async (req, res, throwErr) => {
-      let response = await handle(res, throwErr,
-        this.removeSpotFromRegistration.bind(this), Number(req.params.userId));
-      res.json(response)
-
-      this.moveRegistrationsFromWaitingListIfPossible()
-    })
   },
 
 
@@ -93,12 +85,8 @@ module.exports = {
 
 
   async getRegistrations (getCancelledRegistrations) {
-if (getCancelledRegistrations) {
-  console.log(getCancelledRegistrations ? databaseFacade.queries.getDeletedRegistrations : databaseFacade.queries.getAllRegistrations)
-}
     let allRegistrations = await databaseFacade.execute(getCancelledRegistrations ? databaseFacade.queries.getDeletedRegistrations : databaseFacade.queries.getAllRegistrations)
-// console.log(getCancelledRegistrations ? databaseFacade.queries.getDeletedRegistrations : databaseFacade.queries.getAllRegistrations)
-console.log(getCancelledRegistrations)
+
     for (let registration of allRegistrations) {
       registration.isMainDaysPaid = this.isMainDaysPaid(registration)
       registration.isAddonsPaid = this.isAddonsPaid(registration)
@@ -345,6 +333,8 @@ console.log(getCancelledRegistrations)
 
     await databaseFacade.execute(databaseFacade.queries.deleteRegistration, [userId])
 
+    await this.moveRegistrationsFromWaitingListIfPossible()
+
     return {success: true}
   },
 
@@ -398,16 +388,6 @@ console.log(getCancelledRegistrations)
 
     return {success: true}
   },
-
-
-  async removeSpotFromRegistration (userId) {
-    await databaseFacade.execute(databaseFacade.queries.removeSpotFromRegistration, [userId])
-
-    await this.moveRegistrationsFromWaitingListIfPossible()
-
-    return {success: true}
-  },
-
 
   async moveRegistrationsFromWaitingListIfPossible () {
     let allRegistrations = await this.getAllRegistrations()

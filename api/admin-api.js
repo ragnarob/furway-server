@@ -28,9 +28,9 @@ module.exports = {
       res.json(response)
     })
 
-    app.get('/api/pending-registrations', authApi.authorizeAdminUser, async (req, res, throwErr) => {
+    app.get('/api/driver-info', authApi.authorizeDriverUser, async (req, res, throwErr) => {
       let response = await handle(res, throwErr,
-        this.getPendingRegistrations.bind(this))
+        this.getDriverInfo.bind(this))
       res.json(response)
     })
 
@@ -100,8 +100,38 @@ module.exports = {
     return users
   },
 
-  async getPendingRegistrations () {
-    let pendingRegistrations = await databaseFacade.execute(databaseFacade.queries.getPendingRegistrations)
+  async getDriverInfo () {
+    let users = await databaseFacade.execute(databaseFacade.queries.getUsersInNeedOfDriving)
+
+    let sortedUsers = this.sortUsersInNeedOfDriving(users)
+
+    return sortedUsers
+  },
+
+  sortUsersInNeedOfDriving (users) {
+    let usersNeedingTransport = []
+
+    for (let user of users) {
+      if (user.pickupTime !== null) {
+        user.pickupTime = new Date(user.pickupTime)
+      }
+
+      user.pickupType = user.pickupType.charAt(0).toUpperCase() + user.pickupType.slice(1)
+
+      usersNeedingTransport.push(user)
+    }
+
+    usersNeedingTransport.sort(this.sortByPickupTime)
+
+    return usersNeedingTransport
+  },
+
+  sortByPickupTime (user1, user2) {
+    if (!user1.pickupTime) { return 1 }
+    if (!user2.pickupTime) { return -1 }
+    if (user1.pickupTime < user2.pickupTime) { return -1 }
+    if (user1.pickupTime > user2.pickupTime) { return 1 }
+    return 0
   },
 
   async getAllTextContent () {
