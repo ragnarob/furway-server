@@ -171,15 +171,15 @@ module.exports = {
     }
   },
 
-  async createUser (username, telegramUsername, password1, password2, firstName, lastName, email, dateOfBirth, phone, isVegan, isFursuiter, allergiesText, addressLine1, addressLine2, addressCity, addressStateProvince, addressCountry, additionalInfo) {
+  async createUser (username, telegramUsername, password1, password2, firstName, lastName, email, dateOfBirth, phone, isVegan, isFursuiter, allergiesText, addressLine1, addressLine2, addressCity, addressStateProvince, addressCountry, pikcupType, pickupTime, additionalInfo) {
     this.validateUserFields(username, firstName, lastName, email, dateOfBirth, phone, isVegan, isFursuiter, addressLine1, addressCity, addressCountry)
     
     let hashedPassword = await authApi.validateUserAndHashPassword(username, email, password1, password2)
 
-    let createUserQuery = 'INSERT INTO user (username, password, firstname, lastname, email, dateofbirth, phone, isvegan, isfursuiter, allergiestext, addressline1, addressline2, addresscity, addressstateprovince, addresscountry, additionalinfo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-    let createUserQueryParams = [username, hashedPassword, firstName, lastName, email, dateOfBirth, phone, isVegan, isFursuiter, allergiesText, addressLine1, addressLine2, addressCity, addressStateProvince, addressCountry, additionalInfo]
+    let createUserQueryParams = [username, telegramUsername, hashedPassword, firstName, lastName, email, dateOfBirth, phone, isVegan, isFursuiter, allergiesText, addressLine1, addressLine2, addressCity, addressStateProvince, addressCountry, pikcupType, pickupTime, additionalInfo]
 
-    let result = await databaseFacade.execute(createUserQuery, createUserQueryParams)
+    let result = await databaseFacade.execute(databaseFacade.queries.createUser, createUserQueryParams)
+    
     return result.insertId
   },
 

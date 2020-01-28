@@ -52,8 +52,11 @@ module.exports = {
     let usName = this.generateRandomString(5)
     let fName = this.generateRandomString(5)
     for (var x=0; x<amount; x++) {
+      let pickupType = [null, 'bus', 'train'][Math.floor(Math.random()*3)]
+      let pickupTime = pickupType === null ? null : this.generateRandomPickupTime()
       let userId = await userApi.createUser(
         usName + '__' + x,
+        usName + '__tlgrm',
         'passord',
         'passord',
         fName + ' ' + x,
@@ -66,9 +69,11 @@ module.exports = {
         'Allergi oh no',
         'Addressen min 6',
         'Leil. 44',
-        'Trodnheim',
-        'Trondelag',
+        '4200 Trodnheim',
+        '',
         'Norway',
+        pickupType,
+        pickupTime,
         'Jeg sier litt info fordi det er et felt hvor jeg har lov til det'
       )
 
@@ -90,6 +95,15 @@ module.exports = {
         result += characters.charAt(Math.floor(Math.random() * charactersLength));
     }
     return result;
+  },
+
+  generateRandomPickupTime () {
+    let baseDate = new Date('2020-06-10T10:00:00')
+    let newTime = baseDate.getTime() + 1000*(Math.floor(Math.random() * 86400*4))
+    if (Math.random() > 0.3) {
+      return new Date(newTime)
+    }
+    else { return null }
   },
 
   async getAllUsers () {
