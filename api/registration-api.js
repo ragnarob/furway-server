@@ -54,12 +54,6 @@ module.exports = {
       res.json(response)
     })
     
-    app.post('/api/registrations/user/:userId/update-payment-status', authApi.authorizeAdminUser, async (req, res, throwErr) => {
-      let response = await handle(res, throwErr,
-        this.updateRegistrationPaymentStatus.bind(this), Number(req.params.userId), req.body.isMainDaysInsidePaid, req.body.isMainDaysOutsidePaid, req.body.isLateDeparturePaid, req.body.isEarlyArrivalPaid, req.body.isHoodiePaid, req.body.isTshirtPaid)
-      res.json(response)
-    })
-    
     app.post('/api/registrations/user/:userId/approve', authApi.authorizeAdminUser, async (req, res, throwErr) => {
       let response = await handle(res, throwErr,
         this.approveRegistration.bind(this), Number(req.params.userId));
@@ -88,12 +82,10 @@ module.exports = {
     let allRegistrations = await databaseFacade.execute(getCancelledRegistrations ? databaseFacade.queries.getDeletedRegistrations : databaseFacade.queries.getAllRegistrations)
 
     for (let registration of allRegistrations) {
-      registration.isMainDaysPaid = this.isMainDaysPaid(registration)
-      registration.isAddonsPaid = this.isAddonsPaid(registration)
-
-      let amounts = this.getPaidAndUnpaidAmount(registration)
+      let amounts = this.getPaidAndTotalAmount(registration)
       registration.paidAmount = amounts.paid
-      registration.unpaidAmount = amounts.unpaid
+      registration.totalAmount = amounts.total
+      registration.isPaid = amounts.paid >= amounts.total
 
       this.parseRegistrationBooleans(registration)
     }
@@ -115,8 +107,12 @@ module.exports = {
     }
 
     registrationData = registrationData[0]
-    registrationData.isMainDaysPaid = this.isMainDaysPaid(registrationData)
-    registrationData.isAddonsPaid = this.isAddonsPaid(registrationData)
+    
+    let amounts = this.getPaidAndTotalAmount(registrationData)
+    registrationData.paidAmount = amounts.paid
+    registrationData.totalAmount = amounts.total
+    registrationData.isPaid = amounts.paid >= amounts.total
+
     this.parseRegistrationBooleans(registrationData)
 
     if (this.isRegistrationInWaitingList(registrationData)) {
@@ -129,28 +125,10 @@ module.exports = {
       registrationData.waitingListPositions = {inside: null, outside: null}
     }
 
-    let amounts = this.getPaidAndUnpaidAmount(registrationData)
-    registrationData.paidAmount = amounts.paid
-    registrationData.unpaidAmount = amounts.unpaid
-
     return registrationData
   },
 
-
-  isMainDaysPaid (registration) {
-    return registration.receivedInsideSpot && registration.isMainDaysInsidePaid
-           || registration.receivedOutsideSpot && registration.isMainDaysOutsidePaid
-  },
-
-
-  isAddonsPaid (registration) {
-    return registration.buyHoodie ? registration.isHoodiePaid : true
-           && registration.buyTshirt ? registration.isTshirtPaid : true
-           && registration.earlyArrival ? registration.isEarlyArrivalPaid : true
-           && registration.lateDeparture ? registration.isLateDeparturePaid : true 
-  },
-
-
+  
   isRegistrationInWaitingList (registrationData) {
     if (registrationData['receivedInsideSpot'] === true) {
       return false
@@ -162,43 +140,39 @@ module.exports = {
   },
 
 
-  getPaidAndUnpaidAmount (registration) {
-    let unpaidAmount = 0
+  getPaidAndTotalAmount (registration) {
+    let totalAmountToPay = 0
     let paidAmount = 0
 
     if (registration.receivedInsideSpot) {
-      unpaidAmount += conInfo.mainDaysInsidePriceNok
+      totalAmountToPay += conInfo.mainDaysInsidePriceNok
     }
     else if (registration.receivedOutsideSpot) {
-      unpaidAmount += conInfo.mainDaysOutsidePriceNok
+      totalAmountToPay += conInfo.mainDaysOutsidePriceNok
     }
     else if (registration.roomPreference === 'insideonly') {
-      unpaidAmount += conInfo.mainDaysInsidePriceNok
+      totalAmountToPay += conInfo.mainDaysInsidePriceNok
     }
     else {
-      unpaidAmount += conInfo.mainDaysOutsidePriceNok
+      totalAmountToPay += conInfo.mainDaysOutsidePriceNok
     }
 
     if (registration.earlyArrival) {
-      if (registration.isEarlyArrivalPaid) { paidAmount += conInfo.earlyArrivalPriceNok }
-      else { unpaidAmount += conInfo.earlyArrivalPriceNok }
+      totalAmountToPay += conInfo.earlyArrivalPriceNok
     }
     if (registration.lateDeparture) {
-      if (registration.isLateDeparturePaid) { paidAmount += conInfo.lateDeparturePriceNok }
-      else { unpaidAmount += conInfo.lateDeparturePriceNok }
+      totalAmountToPay += conInfo.lateDeparturePriceNok
     }
     if (registration.buyHoodie) {
-      if (registration.isHoodiePaid) { paidAmount += conInfo.hoodiePriceNok }
-      else { unpaidAmount += conInfo.hoodiePriceNok }
+      totalAmountToPay += conInfo.hoodiePriceNok
     }
     if (registration.buyTshirt) {
-      if (registration.isTshirtPaid) { paidAmount += conInfo.tshirtPriceNok }
-      else { unpaidAmount += conInfo.tshirtPriceNok }
+      totalAmountToPay += conInfo.tshirtPriceNok
     }
 
     return {
       paid: paidAmount,
-      unpaid: unpaidAmount
+      total: totalAmountToPay
     }
   },
 
@@ -223,13 +197,6 @@ module.exports = {
     }
 
     await databaseFacade.execute(databaseFacade.queries.addRegistration, [userId, roomPreference])
-
-    return {success: true}
-  },
-
-
-  async updateRegistrationPaymentStatus (userId, isMainDaysInsidePaid, isMainDaysOutsidePaid, isLateDeparturePaid, isEarlyArrivalPaid, isHoodiePaid, isTshirtPaid) {
-    await databaseFacade.execute(databaseFacade.queries.updateRegistrationPaymentStatus, [isMainDaysInsidePaid, isMainDaysOutsidePaid, isLateDeparturePaid, isEarlyArrivalPaid, isHoodiePaid, isTshirtPaid, userId])
 
     return {success: true}
   },
@@ -284,9 +251,6 @@ module.exports = {
 
 
   async updateApprovedRegistrationAddons (existingRegistration, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize) {
-    if (this.arePaidItemsRemoved(existingRegistration, earlyArrival, lateDeparture, buyTshirt, buyHoodie)) {
-      utils.throwError('You cannot remove items you\'ve already paid for')
-    }
     if (this.areAddonsAddedAfterDeadlines(existingRegistration, earlyArrival, lateDeparture, buyTshirt, buyHoodie)) {
       utils.throwError(`It's too late to add some of these purchasable items`)
     }
@@ -336,7 +300,7 @@ module.exports = {
   async deleteRegistration (userId) {
     let registrationData = await this.getRegistrationByUserId(userId)
 
-    let saveCancelledRegQueryParams = [userId, registrationData.roomPreference, registrationData.earlyArrival, registrationData.lateDeparture, registrationData.buyTshirt, registrationData.buyHoodie, registrationData.tshirtSize, registrationData.hoodieSize, registrationData.timestamp, registrationData.paymentDeadline, registrationData.needsManualPaymentDeadline, registrationData.isAdminApproved, registrationData.receivedInsideSpot, registrationData.receivedOutsideSpot, registrationData.isMainDaysInsidePaid, registrationData.isMainDaysOutsidePaid, registrationData.isEarlyArrivalPaid, registrationData.isLateDeparturePaid, registrationData.isHoodiePaid, registrationData.isTshirtPaid]
+    let saveCancelledRegQueryParams = [userId, registrationData.roomPreference, registrationData.earlyArrival, registrationData.lateDeparture, registrationData.buyTshirt, registrationData.buyHoodie, registrationData.tshirtSize, registrationData.hoodieSize, registrationData.timestamp, registrationData.paymentDeadline, registrationData.needsManualPaymentDeadline, registrationData.isAdminApproved, registrationData.receivedInsideSpot, registrationData.receivedOutsideSpot]
 
     await databaseFacade.execute(databaseFacade.queries.saveCancelledRegistration, saveCancelledRegQueryParams)
 
@@ -345,22 +309,6 @@ module.exports = {
     await this.moveRegistrationsFromWaitingListIfPossible()
 
     return {success: true}
-  },
-
-  
-  arePaidItemsRemoved (existingRegistration, earlyArrival, lateDeparture, buyTshirt, buyHoodie) {
-    return existingRegistration.earlyArrival === 1 && existingRegistration.isEarlyArrivalPaid && earlyArrival === false
-           || existingRegistration.lateDeparture === 1 && existingRegistration.isLateDeparturePaid && lateDeparture === false
-           || existingRegistration.buyTshirt === 1 && existingRegistration.isTshirtPaid && buyTshirt === false
-           || existingRegistration.buyHoodie === 1 && existingRegistration.isHoodiePaid && buyHoodie === false
-  },
-
-
-  arePurchasableItemsAdded (existingRegistration, earlyArrival, lateDeparture, buyTshirt, buyHoodie) {
-    return existingRegistration.earlyArrival === false && earlyArrival === true
-           || existingRegistration.lateDeparture === false && lateDeparture === true
-           || existingRegistration.buyTshirt === false && buyTshirt === true
-           || existingRegistration.buyHoodie === false && buyHoodie === true
   },
 
 
@@ -568,9 +516,6 @@ module.exports = {
 
   getSpotNumbers (allRegistrations) {
     let numbers = {
-      insideSpotsPaid: 0,
-      outsideSpotsPaid: 0,
-      insideSpotsPartiallyPaid: 0,
       insideSpotsReceived: 0,
       outsideSpotsReceived: 0,
       insideSpotsWaitingListLength: 0,
@@ -581,10 +526,6 @@ module.exports = {
       if (registration.roomPreference === 'insideonly') {
         if (registration.receivedInsideSpot) {
           numbers.insideSpotsReceived++
-
-          if (registration.isMainDaysInsidePaid) {
-            numbers.insideSpotsPaid++
-          }
         }
 
         else {
@@ -595,10 +536,6 @@ module.exports = {
       else if (registration.roomPreference === 'outsideonly') {
         if (registration.receivedOutsideSpot) {
           numbers.outsideSpotsReceived++
-
-          if (registration.isMainDaysOutsidePaid) {
-            numbers.outsideSpotsPaid++
-          }
         }
 
         else {
@@ -609,22 +546,11 @@ module.exports = {
       else if (registration.roomPreference === 'insidepreference') {
         if (registration.receivedInsideSpot) {
           numbers.insideSpotsReceived++
-
-          if (registration.isMainDaysInsidePaid) {
-            numbers.insideSpotsPaid++
-          }
-          else if (registration.isMainDaysOutsidePaid) {
-            numbers.insideSpotsPartiallyPaid++
-          }
         }
         
         else if (registration.receivedOutsideSpot) {
           numbers.insideSpotsWaitingListLength++
           numbers.outsideSpotsReceived++
-
-          if (registration.isMainDaysOutsidePaid) {
-            numbers.outsideSpotsPaid++
-          }
         }
 
         else {
@@ -638,6 +564,6 @@ module.exports = {
   },
 
   parseRegistrationBooleans (registration) {
-    utils.convertIntsToBoolean(registration, 'earlyArrival', 'lateDeparture', 'buyTshirt', 'buyHoodie', 'needsManualPaymentDeadline', 'isAdminApproved', 'receivedInsideSpot', 'receivedOutsideSpot', 'isMainDaysInsidePaid', 'isMainDaysOutsidePaid', 'isEarlyArrivalPaid', 'isLateDeparturePaid', 'isHoodiePaid', 'isTshirtPaid', 'isMainDaysPaid', 'isAddonsPaid')
+    utils.convertIntsToBoolean(registration, 'earlyArrival', 'lateDeparture', 'buyTshirt', 'buyHoodie', 'needsManualPaymentDeadline', 'isAdminApproved', 'receivedInsideSpot', 'receivedOutsideSpot', 'isPaid')
   }
 }
