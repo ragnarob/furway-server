@@ -366,13 +366,15 @@ module.exports = {
   async addInsideSpotToWaitingRegistration (userId) {
     let registration = await this.getRegistrationByUserId(userId)
 
+    let currentHighestRegNumber = await this.getCurrentHighestRegNumber()
+
     if (registration.roomPreference === 'insideonly' || 
         registration.roomPreference === 'insidepreference' && !registration.receivedOutsideSpot) {
       if (this.isAutomaticPaymentDeadlineAssignmentAvailable()) {
-        await databaseFacade.execute(databaseFacade.queries.addInsideSpotToRegistration, [conInfo.originalPaymentDeadline, userId])
+        await databaseFacade.execute(databaseFacade.queries.addInsideSpotToRegistration, [conInfo.originalPaymentDeadline, currentHighestRegNumber+1, userId])
       }
       else {
-        await databaseFacade.execute(databaseFacade.queries.addInsideSpotWithoutDeadlineToRegistration, [userId])
+        await databaseFacade.execute(databaseFacade.queries.addInsideSpotWithoutDeadlineToRegistration, [currentHighestRegNumber+1, userId])
       }
     }
 
@@ -388,12 +390,19 @@ module.exports = {
 
 
   async addOutsideSpotToWaitingRegistration (userId) {
+    let currentHighestRegNumber = await this.getCurrentHighestRegNumber()
+
     if (this.isAutomaticPaymentDeadlineAssignmentAvailable()) {
-      await databaseFacade.execute(databaseFacade.queries.addOutsideSpotToRegistration, [conInfo.originalPaymentDeadline, userId])
+      await databaseFacade.execute(databaseFacade.queries.addOutsideSpotToRegistration, [currentHighestRegNumber+1, conInfo.originalPaymentDeadline, userId])
     }
     else {
-      await databaseFacade.execute(databaseFacade.queries.addOutsideSpotWithoutDeadlineToRegistration, [userId])
+      await databaseFacade.execute(databaseFacade.queries.addOutsideSpotWithoutDeadlineToRegistration, [currentHighestRegNumber+1, userId])
     }
+  },
+
+
+  async getCurrentHighestRegNumber  () {
+    return await databaseFacade.execute(databaseFacade.queries.getHighestRegNumber)
   },
 
 

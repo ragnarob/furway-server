@@ -1,7 +1,7 @@
 const mysql = require('mysql')
 const databaseSettings = require('../config/database-settings.json')
 
-const getRegistrationsBase = 'SELECT registration.id AS id, user.username AS username, user.firstname as firstName, user.lastname as lastName, userid AS userId, roompreference AS roomPreference, earlyarrival AS earlyArrival, latedeparture AS lateDeparture, buytshirt AS buyTshirt, buyhoodie AS buyHoodie, tshirtsize AS tshirtSize, hoodiesize AS hoodieSize, timestamp AS timestamp, paymentdeadline AS paymentDeadline, needsmanualpaymentdeadline AS needsManualPaymentDeadline, isadminapproved AS isAdminApproved, receivedinsidespot AS receivedInsideSpot, receivedoutsidespot AS receivedOutsideSpot, adminrejectedreason as adminRejectedReason FROM XXX INNER JOIN user ON (registration.userid = user.id) ORDER BY timestamp ASC'
+const getRegistrationsBase = 'SELECT registration.id AS id, user.username AS username, registration.registrationnumber AS registrationNumber, user.firstname AS firstName, user.lastname AS lastName, userid AS userId, roompreference AS roomPreference, earlyarrival AS earlyArrival, latedeparture AS lateDeparture, buytshirt AS buyTshirt, buyhoodie AS buyHoodie, tshirtsize AS tshirtSize, hoodiesize AS hoodieSize, timestamp AS timestamp, paymentdeadline AS paymentDeadline, needsmanualpaymentdeadline AS needsManualPaymentDeadline, isadminapproved AS isAdminApproved, receivedinsidespot AS receivedInsideSpot, receivedoutsidespot AS receivedOutsideSpot FROM XXX INNER JOIN user ON (registration.userid = user.id) ORDER BY timestamp ASC'
 
 const facade = module.exports = {
   mysqlPool: mysql.createPool(databaseSettings),
@@ -31,9 +31,9 @@ const facade = module.exports = {
       .replace(/registration./g, 'cancelledregistration.')
       .replace('XXX', 'cancelledregistration'),
 
-    getRegistration: 'SELECT registration.id AS id, userid AS userId, roompreference AS roomPreference, earlyarrival AS earlyArrival, latedeparture AS lateDeparture, buytshirt AS buyTshirt, buyhoodie AS buyHoodie, tshirtsize AS tshirtSize, hoodiesize AS hoodieSize, timestamp AS timestamp, paymentdeadline AS paymentDeadline, needsmanualpaymentdeadline AS needsManualPaymentDeadline, isadminapproved AS isAdminApproved, receivedinsidespot AS receivedInsideSpot, receivedoutsidespot AS receivedOutsideSpot, adminrejectedreason AS adminRejectedReason FROM registration WHERE userId = ?',
+    getRegistration: 'SELECT registration.id AS id, userid AS userId, registration.registrationnumber AS registrationNumber, roompreference AS roomPreference, earlyarrival AS earlyArrival, latedeparture AS lateDeparture, buytshirt AS buyTshirt, buyhoodie AS buyHoodie, tshirtsize AS tshirtSize, hoodiesize AS hoodieSize, timestamp AS timestamp, paymentdeadline AS paymentDeadline, needsmanualpaymentdeadline AS needsManualPaymentDeadline, isadminapproved AS isAdminApproved, receivedinsidespot AS receivedInsideSpot, receivedoutsidespot AS receivedOutsideSpot FROM registration WHERE userId = ?',
 
-    getWaitingListRegistrations: `SELECT registration.id AS id, user.username AS username, userid AS userId, roompreference AS roomPreference, earlyarrival AS earlyArrival, latedeparture AS lateDeparture, buytshirt AS buyTshirt, buyhoodie AS buyHoodie, tshirtsize AS tshirtSize, hoodiesize AS hoodieSize, timestamp AS timestamp, paymentdeadline AS paymentDeadline, needsmanualpaymentdeadline AS needsManualPaymentDeadline, isadminapproved AS isAdminApproved, receivedinsidespot AS receivedInsideSpot, receivedoutsidespot AS receivedOutsideSpot, adminrejectedreason as adminRejectedReason FROM registration INNER JOIN user ON (registration.userid = user.id) WHERE isadminapproved=1 AND receivedinsidespot=0 AND (receivedoutsidespot=0 OR roompreference='insidepreference') ORDER BY timestamp ASC`,
+    getWaitingListRegistrations: `SELECT registration.id AS id, user.username AS username, userid AS userId, roompreference AS roomPreference, earlyarrival AS earlyArrival, latedeparture AS lateDeparture, buytshirt AS buyTshirt, buyhoodie AS buyHoodie, tshirtsize AS tshirtSize, hoodiesize AS hoodieSize, timestamp AS timestamp, paymentdeadline AS paymentDeadline, needsmanualpaymentdeadline AS needsManualPaymentDeadline, isadminapproved AS isAdminApproved, receivedinsidespot AS receivedInsideSpot, receivedoutsidespot AS receivedOutsideSpot FROM registration INNER JOIN user ON (registration.userid = user.id) WHERE isadminapproved=1 AND receivedinsidespot=0 AND (receivedoutsidespot=0 OR roompreference='insidepreference') ORDER BY timestamp ASC`,
 
     getPendingRegistrations: `SELECT registration.id AS id, user.username AS username, userid AS userId, roompreference AS roomPreference, timestamp AS timestamp, user.username AS username FROM registration INNER JOIN user ON (registration.userid = user.id) WHERE isadminapproved=0 ORDER BY timestamp ASC`,
 
@@ -47,9 +47,7 @@ const facade = module.exports = {
 
     updateRegistrationAddons: 'UPDATE registration SET earlyarrival=?, latedeparture=?, buytshirt=?, buyhoodie=?, tshirtsize=?, hoodiesize=? WHERE userid=?',
 
-    updateRejectedRegistrationDetails: 'UPDATE registration SET roompreference=?, earlyarrival=?, latedeparture=?, buytshirt=?, buyhoodie=?, tshirtsize=?, hoodiesize=?, timestamp=NOW(), adminrejectedreason = NULL WHERE userid=?',
-
-    approveRegistration: 'UPDATE registration SET isadminapproved = 1, adminrejectedreason = NULL WHERE userid = ?',
+    approveRegistration: 'UPDATE registration SET isadminapproved = 1 WHERE userid = ?',
 
     rejectRegistration: 'UPDATE registration SET isadminapproved = 0 WHERE userid = ?',
 
@@ -59,18 +57,22 @@ const facade = module.exports = {
 
     getFirstRegistrationUserIdInWaitingListOutside: `SELECT userid FROM registration WHERE receivedoutsidespot=0 AND receivedinsidespot=0 AND (roompreference='outsideonly' OR roompreference='insidepreference') AND isadminapproved=1 ORDER BY timestamp ASC LIMIT 1`,
 
-    addInsideSpotToRegistration: `UPDATE registration SET receivedinsidespot = 1, paymentdeadline = ? WHERE userid = ?`,
-    
-    addOutsideSpotToRegistration: `UPDATE registration SET receivedoutsidespot = 1, paymentdeadline = ? WHERE userid = ?`,
+    addInsideSpotToRegistration: `UPDATE registration SET receivedinsidespot = 1, paymentdeadline = ?, registrationnumber = ? WHERE userid = ?`,
 
-    addInsideSpotWithoutDeadlineToRegistration: `UPDATE registration SET receivedinsidespot = 1, needsmanualpaymentdeadline = 1 WHERE userid = ?`,
-    addOutsideSpotWithoutDeadlineToRegistration: `UPDATE registration SET receivedoutsidespot = 1, needsmanualpaymentdeadline = 1 WHERE userid = ?`,
+    addOutsideSpotToRegistration: `UPDATE registration SET receivedoutsidespot = 1, paymentdeadline = ?, registrationnumber = ? WHERE userid = ?`,
+
+    addInsideSpotWithoutDeadlineToRegistration: `UPDATE registration SET receivedinsidespot = 1, needsmanualpaymentdeadline = 1, registrationnumber = ? WHERE userid = ?`,
+
+    addOutsideSpotWithoutDeadlineToRegistration: `UPDATE registration SET receivedoutsidespot = 1, needsmanualpaymentdeadline = 1, registrationnumber = ? WHERE userid = ?`,
 
     addInsideSpotToRegistrationAndRemoveOutsideSpot: `UPDATE registration SET receivedinsidespot = 1, receivedoutsidespot = 0, paymentdeadline = ? WHERE userid = ?`,
+
     addInsideSpotWithoutDeadlineToRegistrationAndRemoveOutsideSpot: `UPDATE registration SET receivedinsidespot = 1, receivedoutsidespot = 0, needsmanualpaymentdeadline = 1 WHERE userid = ?`,
 
     updateRoomPreference: `UPDATE registration SET roompreference = ? WHERE userid = ?`,
     setInsideOnlyAndRemoveOutsideSpot: `UPDATE registration SET roompreference = 'insideonly', receivedoutsidespot = 0 WHERE userid = ?`,
+
+    getHighestRegNumber: 'SELECT MAX(registrationnumber) OR 1 FROM registration',
 
     logRoute: `INSERT INTO log (path) VALUES (?)`,
   },
