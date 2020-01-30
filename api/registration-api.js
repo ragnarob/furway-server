@@ -123,7 +123,7 @@ module.exports = {
       let wantsInsideRoom = registrationData['roomPreference'] === 'insideonly' || registrationData['roomPreference'] === 'insidepreference'
       let wantsOutsideRoom = registrationData['roomPreference'] === 'outsideonly' || registrationData['roomPreference'] === 'insidepreference'
       let receivedOutsideSpot = registrationData['receivedOutsideSpot'] === true
-      registrationData.waitingListPositions = this.getWaitingListPositionsByRegistrationId(registrationData.id, wantsInsideRoom, wantsOutsideRoom, receivedOutsideSpot)
+      registrationData.waitingListPositions = await this.getWaitingListPositionsByRegistrationId(registrationData.id, wantsInsideRoom, wantsOutsideRoom, receivedOutsideSpot)
     }
     else {
       registrationData.waitingListPositions = {inside: null, outside: null}
@@ -166,9 +166,18 @@ module.exports = {
     let unpaidAmount = 0
     let paidAmount = 0
 
-    let mainDaysPrice = registration.receivedInsideSpot === true ? conInfo.mainDaysInsidePriceNok : conInfo.mainDaysOutsidePriceNok
-    if (this.isMainDaysPaid(registration)) {paidAmount += mainDaysPrice }
-    else { unpaidAmount += mainDaysPrice }
+    if (registration.receivedInsideSpot) {
+      unpaidAmount += conInfo.mainDaysInsidePriceNok
+    }
+    else if (registration.receivedOutsideSpot) {
+      unpaidAmount += conInfo.mainDaysOutsidePriceNok
+    }
+    else if (registration.roomPreference === 'insideonly') {
+      unpaidAmount += conInfo.mainDaysInsidePriceNok
+    }
+    else {
+      unpaidAmount += conInfo.mainDaysOutsidePriceNok
+    }
 
     if (registration.earlyArrival) {
       if (registration.isEarlyArrivalPaid) { paidAmount += conInfo.earlyArrivalPriceNok }
@@ -245,11 +254,15 @@ module.exports = {
     }
     
     if (existingRegistration.isAdminApproved === false) {
-      return await this.updateRejectedRegistration(roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize)
+      utils.throwError('This registration has been rejected')
     }
 
-    if (existingRegistration.isAdminApproved === true) {
-      return await this.updateApprovedRegistration(existingRegistration, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize)
+    if (roomPreference !== existingRegistration.roomPreference) {
+      return await this.updateRoomPreference(userId, roomPreference)
+    }
+
+    else if (existingRegistration.isAdminApproved === true) {
+      return await this.updateApprovedRegistrationAddons(existingRegistration, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize)
     }
 
     return {'error': 'Server error: Found nothing to update'}
@@ -257,13 +270,20 @@ module.exports = {
 
 
   async updateUnprocessedRegistration (userId, roomPreference) {
-    await databaseFacade.execute(databaseFacade.queries.updateRegistrationOnlyRoomPreference, [roomPreference, userId])
+    await this.updateRegistrationRoomPrefAndResetTimestamp(userId, roomPreference)
     
+    await this.moveRegistrationsFromWaitingListIfPossible()
+
     return {success: true}
   },
 
 
-  async updateApprovedRegistration (existingRegistration, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize) {
+  async updateRegistrationRoomPrefAndResetTimestamp (userId, roomPreference) {
+    await databaseFacade.execute(databaseFacade.queries.updateRegistrationRoomPrefAndResetTimestamp, [roomPreference, userId])
+  },
+
+
+  async updateApprovedRegistrationAddons (existingRegistration, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize) {
     if (this.arePaidItemsRemoved(existingRegistration, earlyArrival, lateDeparture, buyTshirt, buyHoodie)) {
       utils.throwError('You cannot remove items you\'ve already paid for')
     }
@@ -271,41 +291,32 @@ module.exports = {
       utils.throwError(`It's too late to add some of these purchasable items`)
     }
 
-    if (roomPreference !== existingRegistration.roomPreference) {
-      await this.updateRoomPreference(existingRegistration, roomPreference)
-    }
-    
     await this.updateRegistrationAddons(existingRegistration, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize)
-
-    this.moveRegistrationsFromWaitingListIfPossible()
 
     return {'success': true}
   },
 
 
   async updateRoomPreference (existingRegistration, newRoomPreference) {
-    if (existingRegistration.isMainDaysInsidePaid || existingRegistration.isMainDaysOutsidePaid) {
-      utils.throwError('You cannot change ticket type because you have already paid for it')
-    }
-
     if (existingRegistration.roomPreference === 'insidepreference') {
-      if (existingRegistration.receivedOutsideSpot && newRoomPreference === 'insideonly') {
-        await this.removeCurrentSpotAndAddToOtherQueue('insideonly', existingRegistration.userId)
+      if (!existingRegistration.receivedInsideSpot && !existingRegistration.receivedOutsideSpot) {
+        await this.addToOtherQueue(newRoomPreference, existingRegistration.userId)
+      }
+      else if (existingRegistration.receivedOutsideSpot) {
+        await this.setInsideOnlyAndRemoveOutsideSpot(existingRegistration.userId)
       }
       else {
-        await this.addToOtherQueue(newRoomPreference, existingRegistration.userId)
+        await this.updateRegistrationRoomPrefAndResetTimestamp(existingRegistration.userId, newRoomPreference)
       }
     }
 
     else if (existingRegistration.roomPreference === 'insideonly' || existingRegistration.roomPreference === 'outsideonly') {
-      if (newRoomPreference === 'insidepreference') {
-        await this.addToInsidePreferenceQueue(existingRegistration.userId)
-      }
-
-      else if (newRoomPreference === 'insideonly' || newRoomPreference === 'outsideonly') {
-        await this.removeCurrentSpotAndAddToOtherQueue(newRoomPreference, existingRegistration.userId)
-      }
+      await this.updateRegistrationRoomPrefAndResetTimestamp(existingRegistration.userId, newRoomPreference)
     }
+
+    await this.moveRegistrationsFromWaitingListIfPossible()
+
+    return {'success': true}
   },
 
   async updateRegistrationAddons (existingRegistration, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize) {
@@ -320,9 +331,7 @@ module.exports = {
   },
 
   addToOtherQueue: async (newRoomPref, userId) => await databaseFacade.execute(databaseFacade.queries.updateRoomPreference, [newRoomPref, userId]),
-  addToInsidePreferenceQueue: async userId => await databaseFacade.execute(databaseFacade.queries.updateRoomPreference, ['insidepreference', userId]),
-  removeCurrentSpotAndAddToOtherQueue: async (newRoomPref, userId) => await databaseFacade.execute(databaseFacade.queries.updateRoomPreferenceAndResetSpot, [newRoomPref, userId]),
-
+  setInsideOnlyAndRemoveOutsideSpot: async (userid) => await databaseFacade.execute(databaseFacade.queries.setInsideOnlyAndRemoveOutsideSpot, [userId]),
 
   async deleteRegistration (userId) {
     let registrationData = await this.getRegistrationByUserId(userId)
@@ -334,13 +343,6 @@ module.exports = {
     await databaseFacade.execute(databaseFacade.queries.deleteRegistration, [userId])
 
     await this.moveRegistrationsFromWaitingListIfPossible()
-
-    return {success: true}
-  },
-
-
-  async updateRejectedRegistration (userId, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize) {
-    await databaseFacade.execute(databaseFacade.queries.updateRejectedRegistrationDetails(userId, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize))
 
     return {success: true}
   },
@@ -468,27 +470,6 @@ module.exports = {
     return {success: true}
   },
 
-  async authorizeAdmin (req) {
-    let isAdmin = await authApi.authorizeAdminUser(req)
-    if (!isAdmin) {
-      utils.throwError('No permission')
-    }
-  },
-
-
-  async authorizeUserOrAdmin (req, userId) {
-    let user = utils.getUserFromSession(req)
-
-    if (user && user.id === userId) {
-      return
-    }
-
-    let isAdmin = await authApi.authorizeAdminUser(req)
-    if (!isAdmin) {
-      utils.throwError('No permission')
-    }
-  },
-
 
   isRoomPreferenceLegal (roomPreference) {
     return roomPreference !== undefined && ['insideonly', 'insidepreference', 'outsideonly'].includes(roomPreference.toLowerCase())
@@ -546,6 +527,8 @@ module.exports = {
         }
       }
     }
+
+    return waitingListPositions
   },
 
   

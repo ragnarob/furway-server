@@ -43,7 +43,7 @@ const facade = module.exports = {
 
     saveCancelledRegistration: 'INSERT INTO cancelledregistration (userid, roompreference, earlyarrival, latedeparture, buytshirt, buyhoodie, tshirtsize, hoodiesize, timestamp, paymentdeadline, needsmanualpaymentdeadline, isadminapproved, receivedinsidespot, receivedoutsidespot, ismaindaysinsidePaid, ismaindaysoutsidepaid, isearlyarrivalpaid, islatedeparturepaid, ishoodiepaid, istshirtpaid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
 
-    updateRegistrationOnlyRoomPreference: 'UPDATE registration SET roompreference=? WHERE userid=?',
+    updateRegistrationRoomPrefAndResetTimestamp: 'UPDATE registration SET roompreference=?, timestamp=NOW(), receivedoutsidespot=0, receivedinsidespot=0 WHERE userid=?',
 
     updateRegistrationAddons: 'UPDATE registration SET earlyarrival=?, latedeparture=?, buytshirt=?, buyhoodie=?, tshirtsize=?, hoodiesize=? WHERE userid=?',
 
@@ -71,7 +71,7 @@ const facade = module.exports = {
     addInsideSpotWithoutDeadlineToRegistrationAndRemoveOutsideSpot: `UPDATE registration SET receivedinsidespot = 1, receivedoutsidespot = 0, needsmanualpaymentdeadline = 1 WHERE userid = ?`,
 
     updateRoomPreference: `UPDATE registration SET roompreference = ? WHERE userid = ?`,
-    updateRoomPreferenceAndResetSpot: `UPDATE registration SET roompreference = ?, receivedinsidespot = 0, receivedoutsidespot = 0 WHERE userid = ?`,
+    setInsideOnlyAndRemoveOutsideSpot: `UPDATE registration SET roompreference = 'insideonly', receivedoutsidespot = 0 WHERE userid = ?`,
 
     logRoute: `INSERT INTO log (path) VALUES (?)`,
   },
