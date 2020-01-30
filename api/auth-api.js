@@ -23,6 +23,7 @@ const authMiddleware = module.exports = {
 
     app.post('/logout', async (req, res, throwErr) => {
       this.logout(req)
+
       res.json({'success': true})
     })
 
@@ -33,20 +34,24 @@ const authMiddleware = module.exports = {
       res.json(newUserData)
     })
 
-    app.post('/changepassword', async (req, res, throwErr) => {
+    app.post('/change-password', async (req, res, throwErr) => {
       await handle(res, throwErr,
         this.changePassword.bind(this), req.body.usernameOrEmail, req.body.password, req.body.newPassword1, req.body.newPassword2)
-        res.json({'success': true})
-      })
 
-    app.post('/forgottenpassword', async (req, res, throwErr) => {
+      res.json({'success': true})
+    })
+
+    app.post('/reset-password', async (req, res, throwErr) => {
       await handle(res, throwErr,
         this.handleForgottenPassword.bind(this), req.body.email)
+
+      res.json({'success': true})
     })
 
     app.post('/api/log-route', async (req, res, throwErr) => {
       await handle(res, throwErr,
         this.logRoute.bind(this), req.body.route)
+
       res.json({'success': true})
     })
   },
@@ -97,11 +102,10 @@ const authMiddleware = module.exports = {
     if (!utils.validatePassword(newPassword1)) {
       utils.throwError('Invalid new password')
     }
-
-    let hashedPassword = bcrypt.hash(newPassword1, 8)
-    let updatePasswordQuery = 'UPDATE user SET password = ? WHERE id = ?'
+    let hashedPassword = await bcrypt.hash(newPassword1, 8)
     let updatePasswordQueryParams = [hashedPassword, userData.id]
-    await databaseFacade.execute(updatePasswordQuery, updatePasswordQueryParams)
+
+    await databaseFacade.execute(databaseFacade.queries.changePassword, updatePasswordQueryParams)
   },
 
   async handleForgottenPassword (email) {
@@ -118,15 +122,18 @@ const authMiddleware = module.exports = {
       to: email,
       subject: 'Forgotten password for Furway.no',
       html: `<p>Hi,</p><br/>
-             <p>You may log with temporary password <b>${tempPassword}</b> to 
-             <a href="https://furway.no/forgottenpassword/create">https://furway.no/forgottenpassword/create</a>.</p>
-             <p>You wil be prompted to create a new password.</p><br/>
+             <p>You are receiving this email because someone - hopefully you - requested a password reset for Furway.no</p> 
+             <p>You may log with the password <u><b>${tempPassword}</b></u> to 
+             <a href="https://furway.no/login">https://furway.no/login</a>.</p>
+             <p>You should then create a new password in the 'My Profile' section.</p><br/>
              <p>Regards, the Furway team</p>`
     })
 
-    let updateUserQuery = 'UPDATE user SET temppassword = ? WHERE email = ?'
-    let updateUserQueryParams = [tempPassword, email]
-    await databaseFacade.execute(updateUserQuery, updateUserQueryParams)
+    let hashedPassword = await bcrypt.hash(tempPassword, 8)
+    let updateUserQueryParams = [hashedPassword, email]
+    await databaseFacade.execute(databaseFacade.queries.changePasswordByEmail, updateUserQueryParams)
+
+    return {success: true}
   },
 
   async authenticate (usernameOrEmail, password) {
@@ -212,6 +219,6 @@ const authMiddleware = module.exports = {
   },
 
   generateTempPassword () {
-    return Math.random().toString(36).substring(12);
+    return Math.random().toString(36).substring(6) + '-' + Math.random().toString(36).substring(6) + '-' + Math.random().toString(36).substring(6);
   }
 }

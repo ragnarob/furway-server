@@ -21,6 +21,10 @@ const facade = module.exports = {
 
     deleteUser: 'DELETE FROM user WHERE id=?',
 
+    changePassword: 'UPDATE user SET password = ? WHERE id = ?',
+
+    changePasswordByEmail: 'UPDATE user SET password = ? WHERE email = ?',
+
     getAllRegistrations: getRegistrationsBase.replace('XXX', 'registration'),
 
     getDeletedRegistrations: getRegistrationsBase
