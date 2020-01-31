@@ -47,7 +47,7 @@ const facade = module.exports = {
 
     updateRegistrationAddons: 'UPDATE registration SET earlyarrival=?, latedeparture=?, buytshirt=?, buyhoodie=?, tshirtsize=?, hoodiesize=? WHERE userid=?',
 
-    approveRegistration: 'UPDATE registration SET isadminapproved = 1 WHERE userid = ?',
+    approveRegistration: 'UPDATE registration SET isadminapproved = 1, registrationnumber = (SELECT num FROM (SELECT IFNULL((SELECT MAX(registrationnumber) FROM registration), 0) + 1 AS num) AS nextregnum) WHERE userid = ?',
 
     rejectRegistration: 'UPDATE registration SET isadminapproved = 0 WHERE userid = ?',
 
@@ -57,13 +57,13 @@ const facade = module.exports = {
 
     getFirstRegistrationUserIdInWaitingListOutside: `SELECT userid FROM registration WHERE receivedoutsidespot=0 AND receivedinsidespot=0 AND (roompreference='outsideonly' OR roompreference='insidepreference') AND isadminapproved=1 ORDER BY timestamp ASC LIMIT 1`,
 
-    addInsideSpotToRegistration: `UPDATE registration SET receivedinsidespot = 1, paymentdeadline = ?, registrationnumber = ? WHERE userid = ?`,
+    addInsideSpotToRegistration: `UPDATE registration SET receivedinsidespot = 1, paymentdeadline = ?WHERE userid = ?`,
 
-    addOutsideSpotToRegistration: `UPDATE registration SET receivedoutsidespot = 1, paymentdeadline = ?, registrationnumber = ? WHERE userid = ?`,
+    addOutsideSpotToRegistration: `UPDATE registration SET receivedoutsidespot = 1, paymentdeadline = ? WHERE userid = ?`,
 
-    addInsideSpotWithoutDeadlineToRegistration: `UPDATE registration SET receivedinsidespot = 1, needsmanualpaymentdeadline = 1, registrationnumber = ? WHERE userid = ?`,
+    addInsideSpotWithoutDeadlineToRegistration: `UPDATE registration SET receivedinsidespot = 1, needsmanualpaymentdeadline = 1 WHERE userid = ?`,
 
-    addOutsideSpotWithoutDeadlineToRegistration: `UPDATE registration SET receivedoutsidespot = 1, needsmanualpaymentdeadline = 1, registrationnumber = ? WHERE userid = ?`,
+    addOutsideSpotWithoutDeadlineToRegistration: `UPDATE registration SET receivedoutsidespot = 1, needsmanualpaymentdeadline = 1 WHERE userid = ?`,
 
     addInsideSpotToRegistrationAndRemoveOutsideSpot: `UPDATE registration SET receivedinsidespot = 1, receivedoutsidespot = 0, paymentdeadline = ? WHERE userid = ?`,
 
@@ -71,8 +71,6 @@ const facade = module.exports = {
 
     updateRoomPreference: `UPDATE registration SET roompreference = ? WHERE userid = ?`,
     setInsideOnlyAndRemoveOutsideSpot: `UPDATE registration SET roompreference = 'insideonly', receivedoutsidespot = 0 WHERE userid = ?`,
-
-    getHighestRegNumber: 'SELECT MAX(registrationnumber) OR 1 FROM registration',
 
     logRoute: `INSERT INTO log (path) VALUES (?)`,
   },
