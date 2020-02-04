@@ -48,6 +48,12 @@ module.exports = {
       res.json(response)
     })
     
+    app.post('/api/registrations/user/:userId/update-admin', authApi.authorizeAdminUser, async (req, res, throwErr) => {
+      let response = await handle(res, throwErr,
+        this.updateRegistrationAsAdmin.bind(this), Number(req.params.userId), req.body.roomPreference, req.body.earlyArrival, req.body.lateDeparture, req.body.buyTshirt, req.body.buyHoodie, req.body.tshirtSize, req.body.hoodieSize, req.body.receivedInsideSpot, req.body.receivedOutsideSpot, req.body.paymentDeadline)
+      res.json(response)
+    })
+    
     app.post('/api/registrations/user/:userId/delete', async (req, res, throwErr) => {
       let response = await handleAndAuthorize(req, res, throwErr, Number(req.params.userId),
         this.deleteRegistration.bind(this), Number(req.params.userId))
@@ -179,10 +185,11 @@ module.exports = {
 
   async addRegistration (userId, roomPreference) {
     let existingRegistration = await this.getRegistrationByUserId(userId)
+
     if (existingRegistration.registration !== null) {
       utils.throwError('This user already has a registration')
     }
-    
+
     if (!this.isRoomPreferenceLegal(roomPreference)) {
       utils.throwError('Invalid room preference')
     } 
@@ -202,8 +209,39 @@ module.exports = {
   },
 
 
+  async updateRegistrationAsAdmin (userId, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize, receivedInsideSpot, receivedOutsideSpot, paymentDeadline) {
+    let existingRegistration = await this.getRegistrationByUserId(userId)
+
+    if (existingRegistration.registration === null) {
+      utils.throwError('This user has no registration')
+    }
+
+    if (!this.isRoomPreferenceLegal) {
+      utils.throwError('Invalid room preference')
+    }
+    
+    this.validateRegistrationDetails(userId, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize)
+
+    paymentDeadline = new Date(paymentDeadline)
+    this.validatePaymentDeadline(paymentDeadline)
+
+    let updateQueryParams = [roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize, receivedInsideSpot, receivedOutsideSpot, paymentDeadline, userId]
+    
+    await databaseFacade.execute(databaseFacade.queries.updateAllRegistrationFieldsAsAdmin, updateQueryParams)
+
+    return {'success': true}
+  },
+
+  validatePaymentDeadline (paymentDeadline) {
+    if (paymentDeadline && (paymentDeadline > new Date(conInfo.finalRegPaymentDeadline))) {
+      utils.throwError('Payment deadline cannot be later than final payment deadline')
+    }
+  },
+
+
   async updateRegistration (userId, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize) {
     let existingRegistration = await this.getRegistrationByUserId(userId)
+
     if (existingRegistration.registration === null) {
       utils.throwError('This user has no registration')
     }
@@ -216,9 +254,7 @@ module.exports = {
       return await this.updateUnprocessedRegistration(userId, roomPreference)
     }
     
-    if (!this.validateRegistrationDetails (userId, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize)) {
-      utils.throwError('Missing or invalid fields')
-    }
+    this.validateRegistrationDetails(userId, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize)
     
     if (existingRegistration.isAdminApproved === false) {
       utils.throwError('This registration has been rejected')
@@ -295,7 +331,7 @@ module.exports = {
   },
 
   addToOtherQueue: async (newRoomPref, userId) => await databaseFacade.execute(databaseFacade.queries.updateRoomPreference, [newRoomPref, userId]),
-  setInsideOnlyAndRemoveOutsideSpot: async (userid) => await databaseFacade.execute(databaseFacade.queries.setInsideOnlyAndRemoveOutsideSpot, [userId]),
+  setInsideOnlyAndRemoveOutsideSpot: async (userId) => await databaseFacade.execute(databaseFacade.queries.setInsideOnlyAndRemoveOutsideSpot, [userId]),
 
   async deleteRegistration (userId) {
     let registrationData = await this.getRegistrationByUserId(userId)
@@ -428,7 +464,10 @@ module.exports = {
     let areFieldsOk = utils.areFieldsDefinedAndNotNull(userId, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie)
     let areMerchSizesOk = this.areMerchAndSizesValid(buyHoodie, hoodieSize, buyTshirt, tshirtSize)
 
-    return this.isRoomPreferenceLegal(roomPreference) && areFieldsOk && areMerchSizesOk
+    let areDetailsOk = this.isRoomPreferenceLegal(roomPreference) && areFieldsOk && areMerchSizesOk
+    if (!areDetailsOk) {
+      utils.throwError('Missing or invalid fields')
+    }
   },
 
 
