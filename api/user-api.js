@@ -22,7 +22,7 @@ module.exports = {
 
     app.post('/api/users', async (req, res, throwErr) => {
       let insertId = await handle(res, throwErr,
-        this.createUser.bind(this), req.body.username, req.body.telegramUsername, req.body.password1, req.body.password2, req.body.firstName, req.body.lastName, req.body.email, req.body.dateOfBirth, req.body.phone, req.body.isVegan, req.body.isFursuiter, req.body.allergiesText, req.body.addressLine1, req.body.addressLine2, req.body.addressCity, req.body.addressStateProvince, req.body.addressCountry, req.body.pickupType, req.body.pickupTime, req.body.additionalInfo)
+        this.createUser.bind(this), req.body.username, req.body.telegramUsername, req.body.password1, req.body.password2, req.body.firstName, req.body.lastName, req.body.email, req.body.dateOfBirth, req.body.phone, req.body.phoneCountryCode, req.body.isVegan, req.body.isFursuiter, req.body.allergiesText, req.body.addressLine1, req.body.addressLine2, req.body.addressCity, req.body.addressStateProvince, req.body.addressCountry, req.body.pickupType, req.body.pickupTime, req.body.additionalInfo)
       await handle(req, throwErr,
         authApi.login.bind(authApi), req, req.body.username, req.body.password1)
 
@@ -39,7 +39,7 @@ module.exports = {
 
     app.post('/api/users/:id', async (req, res, throwErr) => {
       await handleAndAuthorize(req, res, throwErr, Number(req.params.id),
-        this.saveUser.bind(this), Number(req.params.id), req.body.username, req.body.telegramUsername, req.body.firstName, req.body.lastName, req.body.email, req.body.dateOfBirth, req.body.phone, req.body.isVegan, req.body.isFursuiter, req.body.allergiesText, req.body.addressLine1, req.body.addressLine2, req.body.addressCity, req.body.addressStateProvince, req.body.addressCountry, req.body.pickupType, req.body.pickupTime, req.body.additionalInfo)
+        this.saveUser.bind(this), Number(req.params.id), req.body.username, req.body.telegramUsername, req.body.firstName, req.body.lastName, req.body.email, req.body.dateOfBirth, req.body.phone, req.body.phoneCountryCode, req.body.isVegan, req.body.isFursuiter, req.body.allergiesText, req.body.addressLine1, req.body.addressLine2, req.body.addressCity, req.body.addressStateProvince, req.body.addressCountry, req.body.pickupType, req.body.pickupTime, req.body.additionalInfo)
 
       let newUserData = await handle(res, throwErr,
         this.getUser.bind(this), Number(req.params.id))
@@ -49,7 +49,7 @@ module.exports = {
 
     app.post('/api/users/:id/as-admin', async (req, res, throwErr) => {
       let response = await handleAndAuthorize(req, res, throwErr, Number(req.params.id),
-        this.saveUserAsAdmin.bind(this), Number(req.params.id), req.body.username, req.body.telegramUsername, req.body.firstName, req.body.lastName, req.body.email, req.body.dateOfBirth, req.body.phone, req.body.isVegan, req.body.isFursuiter, req.body.allergiesText, req.body.addressLine1, req.body.addressLine2, req.body.addressCity, req.body.addressStateProvince, req.body.addressCountry, req.body.pickupType, req.body.pickupTime, req.body.isVolunteer, req.body.isDriver, req.body.isAdmin, req.body.additionalInfo)
+        this.saveUserAsAdmin.bind(this), Number(req.params.id), req.body.username, req.body.telegramUsername, req.body.firstName, req.body.lastName, req.body.email, req.body.dateOfBirth, req.body.phone, req.body.phoneCountryCode, req.body.isVegan, req.body.isFursuiter, req.body.allergiesText, req.body.addressLine1, req.body.addressLine2, req.body.addressCity, req.body.addressStateProvince, req.body.addressCountry, req.body.pickupType, req.body.pickupTime, req.body.isVolunteer, req.body.isDriver, req.body.isAdmin, req.body.additionalInfo)
 
       res.json(response)
     })
@@ -84,32 +84,32 @@ module.exports = {
     return userData
   },
 
-  async saveUser (userId, username, telegramUsername, firstName, lastName, email, dateOfBirth, phone, isVegan, isFursuiter, allergiesText, addressLine1, addressLine2, addressCity, addressStateProvince, addressCountry, pickupType, pickupTime, additionalInfo) {
-    this.validateUserFields(username, firstName, lastName, email, dateOfBirth, phone, isVegan, isFursuiter, addressLine1, addressCity, addressCountry)
+  async saveUser (userId, username, telegramUsername, firstName, lastName, email, dateOfBirth, phone, phoneCountryCode, isVegan, isFursuiter, allergiesText, addressLine1, addressLine2, addressCity, addressStateProvince, addressCountry, pickupType, pickupTime, additionalInfo) {
+    this.validateUserFields(username, firstName, lastName, email, dateOfBirth, phone, phoneCountryCode, isVegan, isFursuiter, addressLine1, addressCity, addressCountry)
 
     pickupTime = this.fixPickupTime(pickupType, pickupTime)
 
-    let saveUserQueryParams = [username, telegramUsername, firstName, lastName, email, new Date(dateOfBirth), phone, isVegan, isFursuiter, allergiesText, addressLine1, addressLine2, addressCity, addressStateProvince, addressCountry, pickupType, pickupTime, additionalInfo, userId]
+    let saveUserQueryParams = [username, telegramUsername, firstName, lastName, email, new Date(dateOfBirth), phone, phoneCountryCode, isVegan, isFursuiter, allergiesText, addressLine1, addressLine2, addressCity, addressStateProvince, addressCountry, pickupType, pickupTime, additionalInfo, userId]
     await databaseFacade.execute(databaseFacade.queries.saveUser, saveUserQueryParams)
 
     return {success: true}
   },
 
-  async saveUserAsAdmin (userId, username, telegramUsername, firstName, lastName, email, dateOfBirth, phone, isVegan, isFursuiter, allergiesText, addressLine1, addressLine2, addressCity, addressStateProvince, addressCountry, pickupType, pickupTime, isVolunteer, isDriver, isAdmin, additionalInfo) {
-    this.validateUserFields(username, firstName, lastName, email, dateOfBirth, phone, isVegan, isFursuiter, addressLine1, addressCity, addressCountry)
+  async saveUserAsAdmin (userId, username, telegramUsername, firstName, lastName, email, dateOfBirth, phone, phoneCountryCode, isVegan, isFursuiter, allergiesText, addressLine1, addressLine2, addressCity, addressStateProvince, addressCountry, pickupType, pickupTime, isVolunteer, isDriver, isAdmin, additionalInfo) {
+    this.validateUserFields(username, firstName, lastName, email, dateOfBirth, phone, phoneCountryCode, isVegan, isFursuiter, addressLine1, addressCity, addressCountry)
     this.validateUserAdminFields(isVolunteer, isDriver, isAdmin)
 
     pickupTime = this.fixPickupTime(pickupType, pickupTime)
 
-    let saveUserQueryParams = [username, telegramUsername, firstName, lastName, email, new Date(dateOfBirth), phone, isVegan, isFursuiter, allergiesText, addressLine1, addressLine2, addressCity, addressStateProvince, addressCountry, pickupType, pickupTime, additionalInfo, isVolunteer, isDriver, isAdmin, userId]
+    let saveUserQueryParams = [username, telegramUsername, firstName, lastName, email, new Date(dateOfBirth), phone, phoneCountryCode, isVegan, isFursuiter, allergiesText, addressLine1, addressLine2, addressCity, addressStateProvince, addressCountry, pickupType, pickupTime, additionalInfo, isVolunteer, isDriver, isAdmin, userId]
     await databaseFacade.execute(databaseFacade.queries.saveUserAsAdmin, saveUserQueryParams)
 
     return {success: true}
   },
 
-  validateUserFields (username, firstName, lastName, email, dateOfBirth, phone, isVegan, isFursuiter, addressLine1, addressCity, addressCountry) {
-    let fields = [username, firstName, lastName, email, dateOfBirth, phone, addressLine1, addressCity, addressCountry]
-    let fieldNames = ['username', 'first name', 'last name', 'email', 'date of birth', 'phone', 'address line 1', 'zip code and area', 'address country']
+  validateUserFields (username, firstName, lastName, email, dateOfBirth, phone, phoneCountryCode, isVegan, isFursuiter, addressLine1, addressCity, addressCountry) {
+    let fields = [username, firstName, lastName, email, dateOfBirth, phone, phoneCountryCode, addressLine1, addressCity, addressCountry]
+    let fieldNames = ['username', 'first name', 'last name', 'email', 'date of birth', 'phone', 'phone country code', 'address line 1', 'zip code and area', 'address country']
     for (let i=0; i<fields.length; i++) {
       if (!fields[i]) {
         utils.throwError(`Missing or invalid fields (${fieldNames[i]})`)
@@ -171,12 +171,12 @@ module.exports = {
     }
   },
 
-  async createUser (username, telegramUsername, password1, password2, firstName, lastName, email, dateOfBirth, phone, isVegan, isFursuiter, allergiesText, addressLine1, addressLine2, addressCity, addressStateProvince, addressCountry, pikcupType, pickupTime, additionalInfo) {
-    this.validateUserFields(username, firstName, lastName, email, dateOfBirth, phone, isVegan, isFursuiter, addressLine1, addressCity, addressCountry)
+  async createUser (username, telegramUsername, password1, password2, firstName, lastName, email, dateOfBirth, phone, phoneCountryCode, isVegan, isFursuiter, allergiesText, addressLine1, addressLine2, addressCity, addressStateProvince, addressCountry, pikcupType, pickupTime, additionalInfo) {
+    this.validateUserFields(username, firstName, lastName, email, dateOfBirth, phone, phoneCountryCode, isVegan, isFursuiter, addressLine1, addressCity, addressCountry)
     
     let hashedPassword = await authApi.validateUserAndHashPassword(username, email, password1, password2)
 
-    let createUserQueryParams = [username, telegramUsername, hashedPassword, firstName, lastName, email, dateOfBirth, phone, isVegan, isFursuiter, allergiesText, addressLine1, addressLine2, addressCity, addressStateProvince, addressCountry, pikcupType, pickupTime, additionalInfo]
+    let createUserQueryParams = [username, telegramUsername, hashedPassword, firstName, lastName, email, dateOfBirth, phone, phoneCountryCode, isVegan, isFursuiter, allergiesText, addressLine1, addressLine2, addressCity, addressStateProvince, addressCountry, pikcupType, pickupTime, additionalInfo]
 
     let result = await databaseFacade.execute(databaseFacade.queries.createUser, createUserQueryParams)
     

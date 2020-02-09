@@ -115,6 +115,10 @@ const authMiddleware = module.exports = {
     if (user.length === 0) {
       utils.throwError('No account with given email')
     }
+  
+    let hashedPassword = await bcrypt.hash(tempPassword, 8)
+    let updateUserQueryParams = [hashedPassword, email]
+    await databaseFacade.execute(databaseFacade.queries.changePasswordByEmail, updateUserQueryParams)
 
     let tempPassword = this.generateTempPassword()
     await emailTransporter.sendMail({
@@ -128,10 +132,6 @@ const authMiddleware = module.exports = {
              <p>You should then create a new password in the 'My Profile' section.</p><br/>
              <p>Regards, the Furway team</p>`
     })
-
-    let hashedPassword = await bcrypt.hash(tempPassword, 8)
-    let updateUserQueryParams = [hashedPassword, email]
-    await databaseFacade.execute(databaseFacade.queries.changePasswordByEmail, updateUserQueryParams)
 
     return {success: true}
   },
