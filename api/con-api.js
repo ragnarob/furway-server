@@ -31,6 +31,7 @@ module.exports = {
   },
 
   async updateConInfo (newConInfo) {
+    this.parseConInfoFields(newConInfo)
     this.validateConInfo(newConInfo)
     await fileSystemFacade.writeFile(path.join(__dirname, '../config/con-info.json'), JSON.stringify(newConInfo))
     await registrationApi.moveRegistrationsFromWaitingListIfPossible()
@@ -38,20 +39,29 @@ module.exports = {
     return {success: true}
   },
 
+  parseConInfoFields (conInfo) {
+    conInfo.mainDaysInsidePriceNok = Number(conInfo.mainDaysInsidePriceNok)
+    conInfo.mainDaysOutsidePriceNok = Number(conInfo.mainDaysOutsidePriceNok)
+    conInfo.earlyArrivalPriceNok = Number(conInfo.earlyArrivalPriceNok)
+    conInfo.lateDeparturePriceNok = Number(conInfo.lateDeparturePriceNok)
+    conInfo.singeDayTicketPriceNok = Number(conInfo.singeDayTicketPriceNok)
+    conInfo.hoodiePriceNok = Number(conInfo.hoodiePriceNok)
+    conInfo.tshirtPriceNok = Number(conInfo.tshirtPriceNok)
+  },
+
   validateConInfo (conInfo) {
     let error = ''
 
-    let startDate = new Date(conInfo.conStartDate)
     let openDate = new Date(conInfo.registrationOpenDate)
     let closeDate = new Date(conInfo.registrationCloseDate)
     let volunteerDate = new Date(conInfo.volunteerRegistrationOpenDate)
-    let originalDeadline = new Date(conInfo.originalPaymentDeadline)
-    let finalDeadline = new Date(conInfo.finalRegPaymentDeadline)
 
-    if (openDate > startDate || closeDate > startDate || finalDeadline > startDate) { error = `Some deadline is after the con's start date` }
-    if (openDate > closeDate) { error = 'Opening date must be before closing date' }
-    else if (openDate < volunteerDate) { error = 'Volunteer opening date must be earlier than general opening date' }
-    else if (originalDeadline > finalDeadline) { error = 'Original payment deadline must be earlier or equal to final payment deadline' }
+    if (openDate > closeDate) {
+      error = 'Opening date must be before closing date'
+    }
+    else if (openDate < volunteerDate) {
+      error = 'Volunteer opening date must be earlier than general opening date'
+    }
     if (conInfo.mainDaysPriceNok < 1 || conInfo.earlyArrivalPriceNok < 1 || conInfo.lateDeparturePriceNok < 1 || conInfo.hoodiePriceNok < 1 || conInfo.tshirtPriceNok < 1) {
       error = 'Some prices are 0 or below'
     }
