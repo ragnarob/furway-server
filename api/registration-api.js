@@ -4,6 +4,7 @@ const handle = handlers.handleRoute
 const handleAndAuthorize = handlers.handleRouteAndAuthorize
 const authApi = require('./auth-api')
 const userApi = require('./user-api')
+const paymentApi = require('./payment-api')
 const utils = require('../utils/utils.js')
 const fileSystemFacade = require('../utils/file-system-facade')
 const conInfo = require('../config/con-info.json')
@@ -88,10 +89,9 @@ module.exports = {
     let allRegistrations = await databaseFacade.execute(getCancelledRegistrations ? databaseFacade.queries.getDeletedRegistrations : databaseFacade.queries.getAllRegistrations)
 
     for (let registration of allRegistrations) {
-      let amounts = this.getPaidAndTotalAmount(registration)
-      registration.paidAmount = amounts.paid
-      registration.totalAmount = amounts.total
-      registration.isPaid = amounts.paid >= amounts.total
+      registration.unpaidAmount = await paymentApi.getRegistrationUnpaidAmount(registration)
+      registration.totalAmount = paymentApi.getRegistrationTotalAmount(registration)
+      registration.isPaid = registration.unpaidAmount === 0
 
       this.parseRegistrationBooleans(registration)
     }
@@ -114,10 +114,9 @@ module.exports = {
 
     registrationData = registrationData[0]
     
-    let amounts = this.getPaidAndTotalAmount(registrationData)
-    registrationData.paidAmount = amounts.paid
-    registrationData.totalAmount = amounts.total
-    registrationData.isPaid = amounts.paid >= amounts.total
+    registrationData.unpaidAmount = await paymentApi.getRegistrationUnpaidAmount(registrationData)
+    registrationData.totalAmount = paymentApi.getRegistrationTotalAmount(registrationData)
+    registrationData.isPaid = registrationData.unpaidAmount === 0
 
     this.parseRegistrationBooleans(registrationData)
 
@@ -146,47 +145,10 @@ module.exports = {
   },
 
 
-  getPaidAndTotalAmount (registration) {
-    let totalAmountToPay = 0
-    let paidAmount = 0
-
-    if (registration.receivedInsideSpot) {
-      totalAmountToPay += conInfo.mainDaysInsidePriceNok
-    }
-    else if (registration.receivedOutsideSpot) {
-      totalAmountToPay += conInfo.mainDaysOutsidePriceNok
-    }
-    else if (registration.roomPreference === 'insideonly') {
-      totalAmountToPay += conInfo.mainDaysInsidePriceNok
-    }
-    else {
-      totalAmountToPay += conInfo.mainDaysOutsidePriceNok
-    }
-
-    if (registration.earlyArrival) {
-      totalAmountToPay += conInfo.earlyArrivalPriceNok
-    }
-    if (registration.lateDeparture) {
-      totalAmountToPay += conInfo.lateDeparturePriceNok
-    }
-    if (registration.buyHoodie) {
-      totalAmountToPay += conInfo.hoodiePriceNok
-    }
-    if (registration.buyTshirt) {
-      totalAmountToPay += conInfo.tshirtPriceNok
-    }
-
-    return {
-      paid: paidAmount,
-      total: totalAmountToPay
-    }
-  },
-
-
   async addRegistration (userId, roomPreference) {
     let existingRegistration = await this.getRegistrationByUserId(userId)
 
-    if (existingRegistration.registration !== null) {
+    if (existingRegistration.registration) {
       utils.throwError('This user already has a registration')
     }
 

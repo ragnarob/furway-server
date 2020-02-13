@@ -29,6 +29,7 @@ require('./api/admin-api').setupRoutes()
 require('./api/registration-api').setupRoutes()
 require('./api/auth-api').setupRoutes()
 require('./api/con-api').setupRoutes()
+require('./api/payment-api').setupRoutes()
 
 const errorHandler = require('./utils/error-handler')
 app.use(errorHandler)

@@ -1,7 +1,7 @@
 const mysql = require('mysql')
 const databaseSettings = require('../config/database-settings.json')
 
-const getRegistrationsBase = 'SELECT user.username AS username, registration.id AS id, registration.registrationnumber AS registrationNumber, user.firstname AS firstName, user.lastname AS lastName, userid AS userId, roompreference AS roomPreference, earlyarrival AS earlyArrival, latedeparture AS lateDeparture, buytshirt AS buyTshirt, buyhoodie AS buyHoodie, tshirtsize AS tshirtSize, hoodiesize AS hoodieSize, timestamp AS timestamp, paymentdeadline AS paymentDeadline, isadminapproved AS isAdminApproved, receivedinsidespot AS receivedInsideSpot, receivedoutsidespot AS receivedOutsideSpot FROM XXX INNER JOIN user ON (registration.userid = user.id) ORDER BY timestamp ASC'
+const getRegistrationsBase = 'SELECT user.username AS username, registration.id AS id, registration.registrationnumber AS registrationNumber, user.firstname AS firstName, user.lastname AS lastName, userid AS userId, roompreference AS roomPreference, earlyarrival AS earlyArrival, latedeparture AS lateDeparture, buytshirt AS buyTshirt, buyhoodie AS buyHoodie, tshirtsize AS tshirtSize, hoodiesize AS hoodieSize, registration.timestamp AS timestamp, paymentdeadline AS paymentDeadline, isadminapproved AS isAdminApproved, receivedinsidespot AS receivedInsideSpot, receivedoutsidespot AS receivedOutsideSpot, COALESCE(SUM(amount), 0) AS paidAmount FROM XXX INNER JOIN user ON (registration.userid = user.id) LEFT JOIN payment ON (registration.id = payment.registrationid) GROUP BY registration.id ORDER BY registration.timestamp ASC'
 
 const facade = module.exports = {
   mysqlPool: mysql.createPool(databaseSettings),
@@ -30,9 +30,12 @@ const facade = module.exports = {
     getDeletedRegistrations: getRegistrationsBase
       .replace(/, registration./g, ', cancelledregistration.')
       .replace('XXX', 'cancelledregistration')
-      .replace('registration.userid', 'cancelledregistration.userid'),
+      .replace('registration.userid', 'cancelledregistration.userid')
+      .replace('(registration.id', '(cancelledregistration.id')
+      .replace(' registration.timestamp', ' cancelledregistration.timestamp')
+      .replace(' registration.id', ' cancelledregistration.id'),
 
-    getRegistration: 'SELECT registration.id AS id, userid AS userId, registration.registrationnumber AS registrationNumber, roompreference AS roomPreference, earlyarrival AS earlyArrival, latedeparture AS lateDeparture, buytshirt AS buyTshirt, buyhoodie AS buyHoodie, tshirtsize AS tshirtSize, hoodiesize AS hoodieSize, timestamp AS timestamp, paymentdeadline AS paymentDeadline, isadminapproved AS isAdminApproved, receivedinsidespot AS receivedInsideSpot, receivedoutsidespot AS receivedOutsideSpot FROM registration WHERE userid = ?',
+    getRegistration: 'SELECT registration.id AS id, userid AS userId, registration.registrationnumber AS registrationNumber, roompreference AS roomPreference, earlyarrival AS earlyArrival, latedeparture AS lateDeparture, buytshirt AS buyTshirt, buyhoodie AS buyHoodie, tshirtsize AS tshirtSize, hoodiesize AS hoodieSize, registration.timestamp AS timestamp, paymentdeadline AS paymentDeadline, isadminapproved AS isAdminApproved, receivedinsidespot AS receivedInsideSpot, receivedoutsidespot AS receivedOutsideSpot, COALESCE(SUM(amount), 0) AS paidAmount FROM registration LEFT JOIN payment ON (registration.id = payment.registrationid) WHERE userid = ?',
 
     getWaitingListRegistrations: `SELECT registration.id AS id, user.username AS username, userid AS userId, roompreference AS roomPreference, earlyarrival AS earlyArrival, latedeparture AS lateDeparture, buytshirt AS buyTshirt, buyhoodie AS buyHoodie, tshirtsize AS tshirtSize, hoodiesize AS hoodieSize, timestamp AS timestamp, paymentdeadline AS paymentDeadline, isadminapproved AS isAdminApproved, receivedinsidespot AS receivedInsideSpot, receivedoutsidespot AS receivedOutsideSpot FROM registration INNER JOIN user ON (registration.userid = user.id) WHERE isadminapproved=1 AND receivedinsidespot=0 AND (receivedoutsidespot=0 OR roompreference='insidepreference') ORDER BY timestamp ASC`,
 
@@ -67,8 +70,12 @@ const facade = module.exports = {
     addInsideSpotToRegistrationAndRemoveOutsideSpot: `UPDATE registration SET receivedinsidespot = 1, receivedoutsidespot = 0, paymentdeadline = ? WHERE userid = ?`,
 
     updateRoomPreference: `UPDATE registration SET roompreference = ? WHERE userid = ?`,
+
+    getPaidAmountByRegistrationId: `SELECT COALESCE(SUM(amount), 0) AS amount FROM payment WHERE registrationid = ?`,
     
     setInsideOnlyAndRemoveOutsideSpot: `UPDATE registration SET roompreference = 'insideonly', receivedoutsidespot = 0 WHERE userid = ?`,
+
+    savePaymentRecord: `INSERT INTO payment (paymentid, registrationid, amount) VALUES (?, ?, ?)`,
 
     logRoute: `INSERT INTO log (path) VALUES (?)`,
   },

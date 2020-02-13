@@ -116,6 +116,11 @@ module.exports = {
       }
     }
 
+    let isValidEmail = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/.test(email)
+    if (!isValidEmail) {
+      utils.throwError('Invalid email address')
+    }
+
     let booleanFields = [isFursuiter, isVegan]
     let booleanFieldNames = ['fursuiter, vegan']
     for (let i=0; i<booleanFields.length; i++) {
