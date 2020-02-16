@@ -75,7 +75,11 @@ const facade = module.exports = {
     
     setInsideOnlyAndRemoveOutsideSpot: `UPDATE registration SET roompreference = 'insideonly', receivedoutsidespot = 0 WHERE userid = ?`,
 
+    removePaymentsFromUser: `DELETE FROM payment WHERE registrationid = ?`,
+
     savePaymentRecord: `INSERT INTO payment (paymentid, registrationid, amount) VALUES (?, ?, ?)`,
+
+    saveOverridePayment: `INSERT INTO payment (registrationid, amount) VALUES (?, ?)`,
 
     logRoute: `INSERT INTO log (path) VALUES (?)`,
   },

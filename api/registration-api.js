@@ -55,6 +55,12 @@ module.exports = {
       res.json(response)
     })
     
+    app.post('/api/registrations/user/:userId/override-payment', authApi.authorizeAdminUser, async (req, res, throwErr) => {
+      let response = await handle(res, throwErr,
+        this.overridePaidAmountAsAdmin.bind(this), Number(req.params.userId), req.body.amount)
+      res.json(response)
+    })
+    
     app.post('/api/registrations/user/:userId/delete', async (req, res, throwErr) => {
       let response = await handleAndAuthorize(req, res, throwErr, Number(req.params.userId),
         this.deleteRegistration.bind(this), Number(req.params.userId))
@@ -189,6 +195,16 @@ module.exports = {
     let updateQueryParams = [roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize, receivedInsideSpot, receivedOutsideSpot, paymentDeadline, userId]
     
     await databaseFacade.execute(databaseFacade.queries.updateAllRegistrationFieldsAsAdmin, updateQueryParams)
+
+    return {'success': true}
+  },
+
+
+  async overridePaidAmountAsAdmin (userId, paidAmount) {
+    let registration = await this.getRegistrationByUserId(userId)
+
+    await databaseFacade.execute(databaseFacade.queries.removePaymentsFromUser, [registration.id])
+    await databaseFacade.execute(databaseFacade.queries.saveOverridePayment, [registration.id, paidAmount])
 
     return {'success': true}
   },
