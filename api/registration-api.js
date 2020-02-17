@@ -376,7 +376,7 @@ module.exports = {
   },
 
   
-  getPaymentDeadline () {
+  async getPaymentDeadline () {
     let conInfo = await conApi.getConInfo()
 
     if (new Date() > new Date(conInfo.originalPaymentDeadline)) {
