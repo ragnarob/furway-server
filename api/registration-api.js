@@ -45,13 +45,13 @@ module.exports = {
     
     app.post('/api/registrations/user/:userId/update', async (req, res, throwErr) => {
       let response = await handleAndAuthorize(req, res, throwErr, Number(req.params.userId),
-        this.updateRegistration.bind(this), Number(req.params.userId), req.body.roomPreference, req.body.earlyArrival, req.body.lateDeparture, req.body.buyTshirt, req.body.buyHoodie, req.body.tshirtSize, req.body.hoodieSize)
+        this.updateRegistration.bind(this), Number(req.params.userId), req.body.roomPreference, req.body.earlyArrival, req.body.lateDeparture, req.body.buyTshirt, req.body.buyHoodie, req.body.tshirtSize, req.body.hoodieSize, req.body.donationAmount)
       res.json(response)
     })
     
     app.post('/api/registrations/user/:userId/update-admin', authApi.authorizeAdminUser, async (req, res, throwErr) => {
       let response = await handle(res, throwErr,
-        this.updateRegistrationAsAdmin.bind(this), Number(req.params.userId), req.body.roomPreference, req.body.earlyArrival, req.body.lateDeparture, req.body.buyTshirt, req.body.buyHoodie, req.body.tshirtSize, req.body.hoodieSize, req.body.receivedInsideSpot, req.body.receivedOutsideSpot, req.body.paymentDeadline)
+        this.updateRegistrationAsAdmin.bind(this), Number(req.params.userId), req.body.roomPreference, req.body.earlyArrival, req.body.lateDeparture, req.body.buyTshirt, req.body.buyHoodie, req.body.tshirtSize, req.body.hoodieSize, req.body.receivedInsideSpot, req.body.receivedOutsideSpot, req.body.paymentDeadline, req.body.donationAmount)
       res.json(response)
     })
     
@@ -97,7 +97,7 @@ module.exports = {
     for (let registration of allRegistrations) {
       registration.unpaidAmount = await paymentApi.getRegistrationUnpaidAmount(registration)
       registration.totalAmount = paymentApi.getRegistrationTotalAmount(registration)
-      registration.isPaid = registration.unpaidAmount === 0
+      registration.isPaid = registration.unpaidAmount < 5
 
       this.parseRegistrationBooleans(registration)
     }
@@ -122,7 +122,7 @@ module.exports = {
     
     registrationData.unpaidAmount = await paymentApi.getRegistrationUnpaidAmount(registrationData)
     registrationData.totalAmount = paymentApi.getRegistrationTotalAmount(registrationData)
-    registrationData.isPaid = registrationData.unpaidAmount === 0
+    registrationData.isPaid = registrationData.unpaidAmount < 5
 
     this.parseRegistrationBooleans(registrationData)
 
@@ -177,7 +177,7 @@ module.exports = {
   },
 
 
-  async updateRegistrationAsAdmin (userId, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize, receivedInsideSpot, receivedOutsideSpot, paymentDeadline) {
+  async updateRegistrationAsAdmin (userId, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize, receivedInsideSpot, receivedOutsideSpot, paymentDeadline, donationAmount) {
     let existingRegistration = await this.getRegistrationByUserId(userId)
 
     if (existingRegistration.registration === null) {
@@ -188,7 +188,7 @@ module.exports = {
       utils.throwError('Invalid room preference')
     }
     
-    this.validateRegistrationDetails(userId, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize)
+    this.validateRegistrationDetails(userId, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize, donationAmount)
 
     paymentDeadline = new Date(paymentDeadline)
 
@@ -210,7 +210,8 @@ module.exports = {
   },
 
 
-  async updateRegistration (userId, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize) {
+  async updateRegistration (userId, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize, donationAmount) {
+    donationAmount = Number(donationAmount)
     let existingRegistration = await this.getRegistrationByUserId(userId)
 
     if (existingRegistration.registration === null) {
@@ -225,7 +226,7 @@ module.exports = {
       return await this.updateUnprocessedRegistration(userId, roomPreference)
     }
     
-    this.validateRegistrationDetails(userId, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize)
+    this.validateRegistrationDetails(userId, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize, donationAmount)
     
     if (existingRegistration.isAdminApproved === false) {
       utils.throwError('This registration has been rejected')
@@ -236,7 +237,7 @@ module.exports = {
     }
 
     else if (existingRegistration.isAdminApproved === true) {
-      return await this.updateApprovedRegistrationAddons(existingRegistration, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize)
+      return await this.updateApprovedRegistrationAddons(existingRegistration, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize, donationAmount)
     }
 
     return {'error': 'Server error: Found nothing to update'}
@@ -252,7 +253,7 @@ module.exports = {
   },
 
 
-  async updateApprovedRegistrationAddons (existingRegistration, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize) {
+  async updateApprovedRegistrationAddons (existingRegistration, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize, donationAmount) {
     if (new Date() > new Date(conInfo.originalPaymentDeadline)) {
       utils.throwError(`You cannot add or remove items after the payment deadline has passed.`)
     }
@@ -261,7 +262,7 @@ module.exports = {
       utils.throwError('Missing merch size')
     }
 
-    let updateRegistrationParams = [earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize, existingRegistration.userId]
+    let updateRegistrationParams = [earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize, donationAmount, existingRegistration.userId]
     await databaseFacade.execute(databaseFacade.queries.updateRegistrationAddons, updateRegistrationParams)
 
     return {'success': true}
@@ -404,9 +405,13 @@ module.exports = {
   },
 
 
-  validateRegistrationDetails (userId, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize) {
+  validateRegistrationDetails (userId, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize, donationAmount) {
     let areFieldsOk = utils.areFieldsDefinedAndNotNull(userId, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie)
     let areMerchSizesOk = this.areMerchAndSizesValid(buyHoodie, hoodieSize, buyTshirt, tshirtSize)
+
+    if (donationAmount < 0) {
+      utils.throwError('Donation amount cannot be lower than zero.')
+    }
 
     let areDetailsOk = this.isRoomPreferenceLegal(roomPreference) && areFieldsOk && areMerchSizesOk
     if (!areDetailsOk) {

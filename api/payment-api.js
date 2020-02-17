@@ -104,6 +104,10 @@ module.exports = {
       totalAmountToPay += conInfo.mainDaysOutsidePriceNok
     }
 
+    if (registration.donationAmount > 0) {
+      totalAmountToPay += registration.donationAmount
+    }
+
     if (registration.earlyArrival) {
       totalAmountToPay += conInfo.earlyArrivalPriceNok
     }
