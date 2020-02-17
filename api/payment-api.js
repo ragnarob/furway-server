@@ -2,7 +2,7 @@ const databaseFacade = require('../utils/database-facade')
 const handlers = require('../utils/handle-route')
 const handle = handlers.handleRoute
 const utils = require('../utils/utils')
-const conInfo = require('../config/con-info.json')
+const conApi = require('./con-api')
 
 const stripe = require('stripe')('sk_test_isgtm3rrdEuuknBv0TDsvd8P');
 
@@ -88,8 +88,9 @@ module.exports = {
   },
 
 
-  getRegistrationTotalAmount (registration) {
+  async getRegistrationTotalAmount (registration) {
     let totalAmountToPay = 0
+    let conInfo = await conApi.getConInfo()
 
     if (registration.receivedInsideSpot) {
       totalAmountToPay += conInfo.mainDaysInsidePriceNok

@@ -7,7 +7,7 @@ const userApi = require('./user-api')
 const paymentApi = require('./payment-api')
 const utils = require('../utils/utils.js')
 const fileSystemFacade = require('../utils/file-system-facade')
-const conInfo = require('../config/con-info.json')
+const conApi = require('./con-api')
 
 module.exports = {
   setupRoutes () {
@@ -160,7 +160,9 @@ module.exports = {
 
     if (!this.isRoomPreferenceLegal(roomPreference)) {
       utils.throwError('Invalid room preference')
-    } 
+    }
+
+    let conInfo = await conApi.getConInfo()
 
     let userData = await userApi.getUser(userId)
     let registrationOpenDate = userData.isVolunteer ? new Date(conInfo.volunteerRegistrationOpenDate) : new Date(conInfo.registrationOpenDate)
@@ -254,6 +256,7 @@ module.exports = {
 
 
   async updateApprovedRegistrationAddons (existingRegistration, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize, donationAmount) {
+    let conInfo = await conApi.getConInfo()
     if (new Date() > new Date(conInfo.originalPaymentDeadline)) {
       utils.throwError(`You cannot add or remove items after the payment deadline has passed.`)
     }
@@ -374,6 +377,8 @@ module.exports = {
 
   
   getPaymentDeadline () {
+    let conInfo = await conApi.getConInfo()
+
     if (new Date() > new Date(conInfo.originalPaymentDeadline)) {
       return conInfo.finalPaymentDeadline
     }
@@ -384,6 +389,8 @@ module.exports = {
 
 
   getSpotAvailabilityCount (allRegistrations) {
+    let conInfo = await conApi.getConInfo()
+
     let insideSpotsAvailable = conInfo.numberOfInsideSpots - allRegistrations.filter(r => r.receivedInsideSpot).length
     let outsideSpotsAvailable = conInfo.numberOfOutsideSpots - allRegistrations.filter(r => r.receivedOutsideSpot).length
     return {
