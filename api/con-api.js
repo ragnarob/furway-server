@@ -27,10 +27,6 @@ module.exports = {
   async getConInfo () {
     let conInfo = require('../config/con-info.json')
     return conInfo
-    // let conInfo = await fileSystemFacade.readFile(path.join(__dirname, '../config/con-info.json'))
-    // conInfo = JSON.parse(conInfo)
-
-    // return conInfo
   },
 
   async updateConInfo (newConInfo) {
@@ -52,6 +48,8 @@ module.exports = {
     conInfo.singeDayTicketPriceNok = Number(conInfo.singeDayTicketPriceNok)
     conInfo.hoodiePriceNok = Number(conInfo.hoodiePriceNok)
     conInfo.tshirtPriceNok = Number(conInfo.tshirtPriceNok)
+    conInfo.numberOfInsideSpots = Number(conInfo.numberOfInsideSpots)
+    conInfo.numberOfOutsideSpots = Number(conInfo.numberOfOutsideSpots)
   },
 
   validateConInfo (conInfo) {

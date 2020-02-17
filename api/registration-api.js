@@ -96,7 +96,7 @@ module.exports = {
 
     for (let registration of allRegistrations) {
       registration.unpaidAmount = await paymentApi.getRegistrationUnpaidAmount(registration)
-      registration.totalAmount = paymentApi.getRegistrationTotalAmount(registration)
+      registration.totalAmount = await paymentApi.getRegistrationTotalAmount(registration)
       registration.isPaid = registration.unpaidAmount < 5
 
       this.parseRegistrationBooleans(registration)
@@ -121,7 +121,7 @@ module.exports = {
     registrationData = registrationData[0]
     
     registrationData.unpaidAmount = await paymentApi.getRegistrationUnpaidAmount(registrationData)
-    registrationData.totalAmount = paymentApi.getRegistrationTotalAmount(registrationData)
+    registrationData.totalAmount = await paymentApi.getRegistrationTotalAmount(registrationData)
     registrationData.isPaid = registrationData.unpaidAmount < 5
 
     this.parseRegistrationBooleans(registrationData)
@@ -334,15 +334,15 @@ module.exports = {
 
   async moveRegistrationsFromWaitingListIfPossible () {
     let allRegistrations = await this.getAllRegistrations()
-    let availableSpots = this.getSpotAvailabilityCount(allRegistrations)
-    let paymentDeadline = this.getPaymentDeadline()
+    let availableSpots = await this.getSpotAvailabilityCount(allRegistrations)
+    let paymentDeadline = await this.getPaymentDeadline()
     
     let firstInsideRegistrationUserIdInWaitingList = (await databaseFacade.execute(databaseFacade.queries.getFirstRegistrationUserIdInWaitingListInside))[0]
     while (availableSpots.inside>0 && firstInsideRegistrationUserIdInWaitingList!=undefined) {
       await this.addInsideSpotToWaitingRegistration(firstInsideRegistrationUserIdInWaitingList.userid, paymentDeadline)
       
       allRegistrations = await this.getAllRegistrations()
-      availableSpots = this.getSpotAvailabilityCount(allRegistrations)
+      availableSpots = await this.getSpotAvailabilityCount(allRegistrations)
       firstInsideRegistrationUserIdInWaitingList = (await databaseFacade.execute(databaseFacade.queries.getFirstRegistrationUserIdInWaitingListInside))[0]
     }
 
@@ -351,7 +351,7 @@ module.exports = {
       await this.addOutsideSpotToWaitingRegistration(firstOutsideRegistrationUserIdInWaitingList.userid, paymentDeadline)
 
       allRegistrations = await this.getAllRegistrations()
-      availableSpots = this.getSpotAvailabilityCount(allRegistrations)
+      availableSpots = await this.getSpotAvailabilityCount(allRegistrations)
       firstOutsideRegistrationUserIdInWaitingList = (await databaseFacade.execute(databaseFacade.queries.getFirstRegistrationUserIdInWaitingListOutside))[0]
     }
   },

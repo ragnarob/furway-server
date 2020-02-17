@@ -70,7 +70,7 @@ module.exports = {
 
 
   async getRegistrationUnpaidAmount (registration) {
-    let totalAmount = this.getRegistrationTotalAmount(registration)
+    let totalAmount = await this.getRegistrationTotalAmount(registration)
     let paidAmount = await this.getRegistrationPaidAmount(registration.id)
 
     return Math.max(totalAmount - paidAmount, 0) 
