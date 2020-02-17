@@ -376,7 +376,7 @@ module.exports = {
   },
 
   
-  getPaymentDeadline () {
+  async getPaymentDeadline () {
     let conInfo = await conApi.getConInfo()
 
     if (new Date() > new Date(conInfo.originalPaymentDeadline)) {
@@ -388,7 +388,7 @@ module.exports = {
   },
 
 
-  getSpotAvailabilityCount (allRegistrations) {
+  async getSpotAvailabilityCount (allRegistrations) {
     let conInfo = await conApi.getConInfo()
 
     let insideSpotsAvailable = conInfo.numberOfInsideSpots - allRegistrations.filter(r => r.receivedInsideSpot).length
