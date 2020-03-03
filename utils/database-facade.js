@@ -1,5 +1,5 @@
 const mysql = require('mysql')
-const databaseSettings = require('../config/database-settings.json')
+const { databaseSettings } = require('../config')
 
 const getRegistrationsBase = 'SELECT user.username AS username, registration.id AS id, registration.registrationnumber AS registrationNumber, user.firstname AS firstName, user.lastname AS lastName, userid AS userId, roompreference AS roomPreference, earlyarrival AS earlyArrival, latedeparture AS lateDeparture, buytshirt AS buyTshirt, buyhoodie AS buyHoodie, tshirtsize AS tshirtSize, hoodiesize AS hoodieSize, registration.timestamp AS timestamp, paymentdeadline AS paymentDeadline, isadminapproved AS isAdminApproved, receivedinsidespot AS receivedInsideSpot, receivedoutsidespot AS receivedOutsideSpot, donationamount AS donationAmount, COALESCE(SUM(amount), 0) AS paidAmount FROM XXX INNER JOIN user ON (registration.userid = user.id) LEFT JOIN payment ON (registration.id = payment.registrationid) GROUP BY registration.id ORDER BY registration.timestamp ASC'
 
@@ -37,6 +37,8 @@ const facade = module.exports = {
 
     getRegistration: 'SELECT registration.id AS id, userid AS userId, registration.registrationnumber AS registrationNumber, roompreference AS roomPreference, earlyarrival AS earlyArrival, latedeparture AS lateDeparture, buytshirt AS buyTshirt, buyhoodie AS buyHoodie, tshirtsize AS tshirtSize, hoodiesize AS hoodieSize, registration.timestamp AS timestamp, paymentdeadline AS paymentDeadline, isadminapproved AS isAdminApproved, receivedinsidespot AS receivedInsideSpot, receivedoutsidespot AS receivedOutsideSpot, donationamount AS donationAmount, COALESCE(SUM(amount), 0) AS paidAmount FROM registration LEFT JOIN payment ON (registration.id = payment.registrationid) WHERE userid = ?',
 
+    getRegistrationSimple: 'SELECT * FROM registration WHERE userid = ?',
+
     getWaitingListRegistrations: `SELECT registration.id AS id, user.username AS username, userid AS userId, roompreference AS roomPreference, earlyarrival AS earlyArrival, latedeparture AS lateDeparture, buytshirt AS buyTshirt, buyhoodie AS buyHoodie, tshirtsize AS tshirtSize, hoodiesize AS hoodieSize, timestamp AS timestamp, paymentdeadline AS paymentDeadline, isadminapproved AS isAdminApproved, receivedinsidespot AS receivedInsideSpot, receivedoutsidespot AS receivedOutsideSpot FROM registration INNER JOIN user ON (registration.userid = user.id) WHERE isadminapproved=1 AND receivedinsidespot=0 AND (receivedoutsidespot=0 OR roompreference='insidepreference') ORDER BY timestamp ASC`,
 
     getPendingRegistrations: `SELECT registration.id AS id, user.username AS username, userid AS userId, roompreference AS roomPreference, timestamp AS timestamp, user.username AS username FROM registration INNER JOIN user ON (registration.userid = user.id) WHERE isadminapproved=0 ORDER BY timestamp ASC`,
@@ -63,7 +65,7 @@ const facade = module.exports = {
 
     getFirstRegistrationUserIdInWaitingListOutside: `SELECT userid FROM registration WHERE receivedoutsidespot=0 AND receivedinsidespot=0 AND (roompreference='outsideonly' OR roompreference='insidepreference') AND isadminapproved=1 ORDER BY timestamp ASC LIMIT 1`,
 
-    addInsideSpotToRegistration: `UPDATE registration SET receivedinsidespot = 1, paymentdeadline = ?WHERE userid = ?`,
+    addInsideSpotToRegistration: `UPDATE registration SET receivedinsidespot = 1, paymentdeadline = ? WHERE userid = ?`,
 
     addOutsideSpotToRegistration: `UPDATE registration SET receivedoutsidespot = 1, paymentdeadline = ? WHERE userid = ?`,
 

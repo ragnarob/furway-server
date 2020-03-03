@@ -3,3 +3,4 @@ package-lock.json
 con-info.json
 .vscode
 public/*
+.env

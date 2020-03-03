@@ -33,18 +33,6 @@ module.exports = {
         this.getDriverInfo.bind(this))
       res.json(response)
     })
-
-    app.get('/api/static-content', authApi.authorizeAdminUser, async (req, res, throwErr) => {
-      let response = await handle(res, throwErr,
-        this.getAllTextContent.bind(this))
-      res.json(response)
-    })
-
-    app.post('/api/static-content/:contentId', authApi.authorizeAdminUser, async (req, res, throwErr) =>  {
-      let response = await handle(res, throwErr,
-        this.updateTextContent.bind(this), req.params.contentId, req.body.content)
-      res.json(response)
-    })
   },
 
 
@@ -146,16 +134,5 @@ module.exports = {
     if (user1.pickupTime < user2.pickupTime) { return -1 }
     if (user1.pickupTime > user2.pickupTime) { return 1 }
     return 0
-  },
-
-  async getAllTextContent () {
-    let content = require('../static/text-content.json')
-    return content
-  },
-
-  async updateTextContent (contentId, newContent) {
-    let textContent = require('../static/text-content.json')
-    textContent[contentId] = newContent
-    await fileSystemFacade.writeFile(path.join(__dirname, '../static/text-content.json'), JSON.stringify(textContent))
   },
 }

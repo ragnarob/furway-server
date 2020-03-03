@@ -3,8 +3,9 @@ const handlers = require('../utils/handle-route')
 const handle = handlers.handleRoute
 const utils = require('../utils/utils')
 const conApi = require('./con-api')
+const { stripeSecretKey } = require('../config')
 
-const stripe = require('stripe')('sk_test_isgtm3rrdEuuknBv0TDsvd8P');
+const stripe = require('stripe')(stripeSecretKey)
 
 module.exports = {
   setupRoutes () {
