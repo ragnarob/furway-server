@@ -111,6 +111,13 @@ module.exports = {
   },
 
 
+  async doesUserHaveRegistration (userId) {
+    let registration = await databaseFacade.execute(databaseFacade.queries.getRegistrationSimple, [userId])
+
+    return registration.length > 0
+  },
+
+
   async getRegistrationByUserId (userId) {
     let registrationData = await databaseFacade.execute(databaseFacade.queries.getRegistration, [userId])
 
@@ -119,7 +126,7 @@ module.exports = {
     }
 
     registrationData = registrationData[0]
-    
+
     registrationData.unpaidAmount = await paymentApi.getRegistrationUnpaidAmount(registrationData)
     registrationData.totalAmount = await paymentApi.getRegistrationTotalAmount(registrationData)
     registrationData.isPaid = registrationData.unpaidAmount < 5
@@ -152,9 +159,9 @@ module.exports = {
 
 
   async addRegistration (userId, roomPreference) {
-    let existingRegistration = await this.getRegistrationByUserId(userId)
+    let existingRegistration = await this.doesUserHaveRegistration(userId)
 
-    if (existingRegistration.registration) {
+    if (existingRegistration) {
       utils.throwError('This user already has a registration')
     }
 
@@ -166,8 +173,13 @@ module.exports = {
 
     let userData = await userApi.getUser(userId)
     let registrationOpenDate = userData.isVolunteer ? new Date(conInfo.volunteerRegistrationOpenDate) : new Date(conInfo.registrationOpenDate)
+
+    let tempDate = new Date(registrationOpenDate + 'Z')
+    tempDate.setTime(tempDate.getTime() - 3600000)
+    registrationOpenDate = new Date(tempDate.toISOString())
+
     if (new Date().getTime() < registrationOpenDate.getTime()) {
-      utils.throwError('Registration has not yet opened')
+      utils.throwError(`Registration has not yet opened! Opens in ${Math.round(100*((registrationOpenDate - new Date())/3600000))/100} hours.`)
     }
     if (new Date().getTime() > new Date(conInfo.registrationCloseDate).getTime()) {
       utils.throwError('Registration has closed')
