@@ -4,9 +4,10 @@ const handle = handlers.handleRoute
 const handleAndAuthorize = handlers.handleRouteAndAuthorize
 const authApi = require('./auth-api')
 const userApi = require('./user-api')
+const paymentApi = require('./payment-api')
 const utils = require('../utils/utils.js')
 const fileSystemFacade = require('../utils/file-system-facade')
-const conInfo = require('../config/con-info.json')
+const conApi = require('./con-api')
 
 module.exports = {
   setupRoutes () {
@@ -44,13 +45,19 @@ module.exports = {
     
     app.post('/api/registrations/user/:userId/update', async (req, res, throwErr) => {
       let response = await handleAndAuthorize(req, res, throwErr, Number(req.params.userId),
-        this.updateRegistration.bind(this), Number(req.params.userId), req.body.roomPreference, req.body.earlyArrival, req.body.lateDeparture, req.body.buyTshirt, req.body.buyHoodie, req.body.tshirtSize, req.body.hoodieSize)
+        this.updateRegistration.bind(this), Number(req.params.userId), req.body.roomPreference, req.body.earlyArrival, req.body.lateDeparture, req.body.buyTshirt, req.body.buyHoodie, req.body.tshirtSize, req.body.hoodieSize, req.body.donationAmount)
       res.json(response)
     })
     
     app.post('/api/registrations/user/:userId/update-admin', authApi.authorizeAdminUser, async (req, res, throwErr) => {
       let response = await handle(res, throwErr,
-        this.updateRegistrationAsAdmin.bind(this), Number(req.params.userId), req.body.roomPreference, req.body.earlyArrival, req.body.lateDeparture, req.body.buyTshirt, req.body.buyHoodie, req.body.tshirtSize, req.body.hoodieSize, req.body.receivedInsideSpot, req.body.receivedOutsideSpot, req.body.paymentDeadline)
+        this.updateRegistrationAsAdmin.bind(this), Number(req.params.userId), req.body.roomPreference, req.body.earlyArrival, req.body.lateDeparture, req.body.buyTshirt, req.body.buyHoodie, req.body.tshirtSize, req.body.hoodieSize, req.body.receivedInsideSpot, req.body.receivedOutsideSpot, req.body.paymentDeadline, req.body.donationAmount)
+      res.json(response)
+    })
+    
+    app.post('/api/registrations/user/:userId/override-payment', authApi.authorizeAdminUser, async (req, res, throwErr) => {
+      let response = await handle(res, throwErr,
+        this.overridePaidAmountAsAdmin.bind(this), Number(req.params.userId), req.body.amount)
       res.json(response)
     })
     
@@ -88,10 +95,9 @@ module.exports = {
     let allRegistrations = await databaseFacade.execute(getCancelledRegistrations ? databaseFacade.queries.getDeletedRegistrations : databaseFacade.queries.getAllRegistrations)
 
     for (let registration of allRegistrations) {
-      let amounts = this.getPaidAndTotalAmount(registration)
-      registration.paidAmount = amounts.paid
-      registration.totalAmount = amounts.total
-      registration.isPaid = amounts.paid >= amounts.total
+      registration.unpaidAmount = await paymentApi.getRegistrationUnpaidAmount(registration)
+      registration.totalAmount = await paymentApi.getRegistrationTotalAmount(registration)
+      registration.isPaid = registration.unpaidAmount < 5
 
       this.parseRegistrationBooleans(registration)
     }
@@ -105,6 +111,13 @@ module.exports = {
   },
 
 
+  async doesUserHaveRegistration (userId) {
+    let registration = await databaseFacade.execute(databaseFacade.queries.getRegistrationSimple, [userId])
+
+    return registration.length > 0
+  },
+
+
   async getRegistrationByUserId (userId) {
     let registrationData = await databaseFacade.execute(databaseFacade.queries.getRegistration, [userId])
 
@@ -113,11 +126,10 @@ module.exports = {
     }
 
     registrationData = registrationData[0]
-    
-    let amounts = this.getPaidAndTotalAmount(registrationData)
-    registrationData.paidAmount = amounts.paid
-    registrationData.totalAmount = amounts.total
-    registrationData.isPaid = amounts.paid >= amounts.total
+
+    registrationData.unpaidAmount = await paymentApi.getRegistrationUnpaidAmount(registrationData)
+    registrationData.totalAmount = await paymentApi.getRegistrationTotalAmount(registrationData)
+    registrationData.isPaid = registrationData.unpaidAmount < 5
 
     this.parseRegistrationBooleans(registrationData)
 
@@ -146,58 +158,28 @@ module.exports = {
   },
 
 
-  getPaidAndTotalAmount (registration) {
-    let totalAmountToPay = 0
-    let paidAmount = 0
-
-    if (registration.receivedInsideSpot) {
-      totalAmountToPay += conInfo.mainDaysInsidePriceNok
-    }
-    else if (registration.receivedOutsideSpot) {
-      totalAmountToPay += conInfo.mainDaysOutsidePriceNok
-    }
-    else if (registration.roomPreference === 'insideonly') {
-      totalAmountToPay += conInfo.mainDaysInsidePriceNok
-    }
-    else {
-      totalAmountToPay += conInfo.mainDaysOutsidePriceNok
-    }
-
-    if (registration.earlyArrival) {
-      totalAmountToPay += conInfo.earlyArrivalPriceNok
-    }
-    if (registration.lateDeparture) {
-      totalAmountToPay += conInfo.lateDeparturePriceNok
-    }
-    if (registration.buyHoodie) {
-      totalAmountToPay += conInfo.hoodiePriceNok
-    }
-    if (registration.buyTshirt) {
-      totalAmountToPay += conInfo.tshirtPriceNok
-    }
-
-    return {
-      paid: paidAmount,
-      total: totalAmountToPay
-    }
-  },
-
-
   async addRegistration (userId, roomPreference) {
-    let existingRegistration = await this.getRegistrationByUserId(userId)
+    let existingRegistration = await this.doesUserHaveRegistration(userId)
 
-    if (existingRegistration.registration !== null) {
+    if (existingRegistration) {
       utils.throwError('This user already has a registration')
     }
 
     if (!this.isRoomPreferenceLegal(roomPreference)) {
       utils.throwError('Invalid room preference')
-    } 
+    }
+
+    let conInfo = await conApi.getConInfo()
 
     let userData = await userApi.getUser(userId)
     let registrationOpenDate = userData.isVolunteer ? new Date(conInfo.volunteerRegistrationOpenDate) : new Date(conInfo.registrationOpenDate)
+
+    let tempDate = new Date(registrationOpenDate + 'Z')
+    tempDate.setTime(tempDate.getTime() - 3600000)
+    registrationOpenDate = new Date(tempDate.toISOString())
+
     if (new Date().getTime() < registrationOpenDate.getTime()) {
-      utils.throwError('Registration has not yet opened')
+      utils.throwError(`Registration has not yet opened! Opens in ${Math.round(100*((registrationOpenDate - new Date())/3600000))/100} hours.`)
     }
     if (new Date().getTime() > new Date(conInfo.registrationCloseDate).getTime()) {
       utils.throwError('Registration has closed')
@@ -209,7 +191,7 @@ module.exports = {
   },
 
 
-  async updateRegistrationAsAdmin (userId, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize, receivedInsideSpot, receivedOutsideSpot, paymentDeadline) {
+  async updateRegistrationAsAdmin (userId, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize, receivedInsideSpot, receivedOutsideSpot, paymentDeadline, donationAmount) {
     let existingRegistration = await this.getRegistrationByUserId(userId)
 
     if (existingRegistration.registration === null) {
@@ -220,10 +202,9 @@ module.exports = {
       utils.throwError('Invalid room preference')
     }
     
-    this.validateRegistrationDetails(userId, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize)
+    this.validateRegistrationDetails(userId, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize, donationAmount)
 
     paymentDeadline = new Date(paymentDeadline)
-    this.validatePaymentDeadline(paymentDeadline)
 
     let updateQueryParams = [roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize, receivedInsideSpot, receivedOutsideSpot, paymentDeadline, userId]
     
@@ -232,14 +213,19 @@ module.exports = {
     return {'success': true}
   },
 
-  validatePaymentDeadline (paymentDeadline) {
-    if (paymentDeadline && (paymentDeadline > new Date(conInfo.finalRegPaymentDeadline))) {
-      utils.throwError('Payment deadline cannot be later than final payment deadline')
-    }
+
+  async overridePaidAmountAsAdmin (userId, paidAmount) {
+    let registration = await this.getRegistrationByUserId(userId)
+
+    await databaseFacade.execute(databaseFacade.queries.removePaymentsFromUser, [registration.id])
+    await databaseFacade.execute(databaseFacade.queries.saveOverridePayment, [registration.id, paidAmount])
+
+    return {'success': true}
   },
 
 
-  async updateRegistration (userId, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize) {
+  async updateRegistration (userId, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize, donationAmount) {
+    donationAmount = Number(donationAmount)
     let existingRegistration = await this.getRegistrationByUserId(userId)
 
     if (existingRegistration.registration === null) {
@@ -254,7 +240,7 @@ module.exports = {
       return await this.updateUnprocessedRegistration(userId, roomPreference)
     }
     
-    this.validateRegistrationDetails(userId, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize)
+    this.validateRegistrationDetails(userId, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize, donationAmount)
     
     if (existingRegistration.isAdminApproved === false) {
       utils.throwError('This registration has been rejected')
@@ -265,7 +251,7 @@ module.exports = {
     }
 
     else if (existingRegistration.isAdminApproved === true) {
-      return await this.updateApprovedRegistrationAddons(existingRegistration, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize)
+      return await this.updateApprovedRegistrationAddons(existingRegistration, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize, donationAmount)
     }
 
     return {'error': 'Server error: Found nothing to update'}
@@ -281,17 +267,18 @@ module.exports = {
   },
 
 
-  async updateRegistrationRoomPrefAndResetTimestamp (userId, roomPreference) {
-    await databaseFacade.execute(databaseFacade.queries.updateRegistrationRoomPrefAndResetTimestamp, [roomPreference, userId])
-  },
-
-
-  async updateApprovedRegistrationAddons (existingRegistration, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize) {
-    if (this.areAddonsAddedAfterDeadlines(existingRegistration, earlyArrival, lateDeparture, buyTshirt, buyHoodie)) {
-      utils.throwError(`It's too late to add some of these purchasable items`)
+  async updateApprovedRegistrationAddons (existingRegistration, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize, donationAmount) {
+    let conInfo = await conApi.getConInfo()
+    if (new Date() > new Date(conInfo.originalPaymentDeadline)) {
+      utils.throwError(`You cannot add or remove items after the payment deadline has passed.`)
     }
 
-    await this.updateRegistrationAddons(existingRegistration, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize)
+    if ((buyTshirt && !tshirtSize) || (buyHoodie && !hoodieSize)) {
+      utils.throwError('Missing merch size')
+    }
+
+    let updateRegistrationParams = [earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize, donationAmount, existingRegistration.userId]
+    await databaseFacade.execute(databaseFacade.queries.updateRegistrationAddons, updateRegistrationParams)
 
     return {'success': true}
   },
@@ -302,8 +289,14 @@ module.exports = {
       if (!existingRegistration.receivedInsideSpot && !existingRegistration.receivedOutsideSpot) {
         await this.addToOtherQueue(newRoomPreference, existingRegistration.userId)
       }
-      else if (existingRegistration.receivedOutsideSpot) {
+      else if (existingRegistration.receivedInsideSpot && newRoomPreference === 'insideonly') {
+        utils.throwError(`You've already received an inside spot, no need to change ticket`)
+      }
+      else if (existingRegistration.receivedOutsideSpot && newRoomPreference === 'insideonly') {
         await this.setInsideOnlyAndRemoveOutsideSpot(existingRegistration.userId)
+      }
+      else if (existingRegistration.receivedOutsideSpot && newRoomPreference === 'outsideonly') {
+        await this.updateRegistrationRoomPrefKeepTimestamp(newRoomPreference, existingRegistration.userId)
       }
       else {
         await this.updateRegistrationRoomPrefAndResetTimestamp(existingRegistration.userId, newRoomPreference)
@@ -319,24 +312,19 @@ module.exports = {
     return {'success': true}
   },
 
-  async updateRegistrationAddons (existingRegistration, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize) {
-    if ((buyTshirt && !tshirtSize) || (buyHoodie && !hoodieSize)) {
-      utils.throwError('Missing merch size')
-    }
-
-    let updateRegistrationParams = [earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize, existingRegistration.userId]
-    await databaseFacade.execute(databaseFacade.queries.updateRegistrationAddons, updateRegistrationParams)
-
-    return {success: true}
-  },
-
   addToOtherQueue: async (newRoomPref, userId) => await databaseFacade.execute(databaseFacade.queries.updateRoomPreference, [newRoomPref, userId]),
+
   setInsideOnlyAndRemoveOutsideSpot: async (userId) => await databaseFacade.execute(databaseFacade.queries.setInsideOnlyAndRemoveOutsideSpot, [userId]),
+
+  updateRegistrationRoomPrefAndResetTimestamp: async (userId, roomPreference) =>
+    await databaseFacade.execute(databaseFacade.queries.updateRegistrationRoomPrefAndResetTimestamp, [roomPreference, userId]),
+
+  updateRegistrationRoomPrefKeepTimestamp: async (newRoomPref, userId) => await databaseFacade.execute(databaseFacade.queries.updateRoomPreference, [newRoomPref, userId]),
 
   async deleteRegistration (userId) {
     let registrationData = await this.getRegistrationByUserId(userId)
 
-    let saveCancelledRegQueryParams = [userId, registrationData.roomPreference, registrationData.earlyArrival, registrationData.lateDeparture, registrationData.buyTshirt, registrationData.buyHoodie, registrationData.tshirtSize, registrationData.hoodieSize, registrationData.timestamp, registrationData.paymentDeadline, registrationData.needsManualPaymentDeadline, registrationData.isAdminApproved, registrationData.receivedInsideSpot, registrationData.receivedOutsideSpot]
+    let saveCancelledRegQueryParams = [userId, registrationData.roomPreference, registrationData.earlyArrival, registrationData.lateDeparture, registrationData.buyTshirt, registrationData.buyHoodie, registrationData.tshirtSize, registrationData.hoodieSize, registrationData.timestamp, registrationData.paymentDeadline, registrationData.isAdminApproved, registrationData.receivedInsideSpot, registrationData.receivedOutsideSpot]
 
     await databaseFacade.execute(databaseFacade.queries.saveCancelledRegistration, saveCancelledRegQueryParams)
 
@@ -345,25 +333,6 @@ module.exports = {
     await this.moveRegistrationsFromWaitingListIfPossible()
 
     return {success: true}
-  },
-
-
-  areAddonsAddedAfterDeadlines (existingRegistration, earlyArrival, lateDeparture, buyTshirt, buyHoodie) {
-    if (!existingRegistration.earlyArrival && earlyArrival
-        || !existingRegistration.lateDeparture && lateDeparture) {
-      if (new Date() > new Date(conInfo.addEarlyOrLatePaymentDeadline)) {
-        return true
-      }
-    }
-
-    if (!existingRegistration.buyTshirt && buyTshirt
-        || !existingRegistration.buyHoodie && buyHoodie) {
-      if (new Date() > new Date(conInfo.merchPaymentDeadline)) {
-        return true
-      }
-    }
-
-    return false
   },
 
 
@@ -377,68 +346,63 @@ module.exports = {
 
   async moveRegistrationsFromWaitingListIfPossible () {
     let allRegistrations = await this.getAllRegistrations()
-    let availableSpots = this.getSpotAvailabilityCount(allRegistrations)
+    let availableSpots = await this.getSpotAvailabilityCount(allRegistrations)
+    let paymentDeadline = await this.getPaymentDeadline()
     
     let firstInsideRegistrationUserIdInWaitingList = (await databaseFacade.execute(databaseFacade.queries.getFirstRegistrationUserIdInWaitingListInside))[0]
     while (availableSpots.inside>0 && firstInsideRegistrationUserIdInWaitingList!=undefined) {
-      await this.addInsideSpotToWaitingRegistration(firstInsideRegistrationUserIdInWaitingList.userid)
+      await this.addInsideSpotToWaitingRegistration(firstInsideRegistrationUserIdInWaitingList.userid, paymentDeadline)
       
       allRegistrations = await this.getAllRegistrations()
-      availableSpots = this.getSpotAvailabilityCount(allRegistrations)
+      availableSpots = await this.getSpotAvailabilityCount(allRegistrations)
       firstInsideRegistrationUserIdInWaitingList = (await databaseFacade.execute(databaseFacade.queries.getFirstRegistrationUserIdInWaitingListInside))[0]
     }
 
     let firstOutsideRegistrationUserIdInWaitingList = (await databaseFacade.execute(databaseFacade.queries.getFirstRegistrationUserIdInWaitingListOutside))[0]
     while (availableSpots.outside>0 && firstOutsideRegistrationUserIdInWaitingList!=undefined) {
-      await this.addOutsideSpotToWaitingRegistration(firstOutsideRegistrationUserIdInWaitingList.userid)
+      await this.addOutsideSpotToWaitingRegistration(firstOutsideRegistrationUserIdInWaitingList.userid, paymentDeadline)
 
       allRegistrations = await this.getAllRegistrations()
-      availableSpots = this.getSpotAvailabilityCount(allRegistrations)
+      availableSpots = await this.getSpotAvailabilityCount(allRegistrations)
       firstOutsideRegistrationUserIdInWaitingList = (await databaseFacade.execute(databaseFacade.queries.getFirstRegistrationUserIdInWaitingListOutside))[0]
     }
   },
 
 
-  async addInsideSpotToWaitingRegistration (userId) {
+  async addInsideSpotToWaitingRegistration (userId, paymentDeadline) {
     let registration = await this.getRegistrationByUserId(userId)
 
     if (registration.roomPreference === 'insideonly' || 
         registration.roomPreference === 'insidepreference' && !registration.receivedOutsideSpot) {
-      if (this.isAutomaticPaymentDeadlineAssignmentAvailable()) {
-        await databaseFacade.execute(databaseFacade.queries.addInsideSpotToRegistration, [conInfo.originalPaymentDeadline, userId])
-      }
-      else {
-        await databaseFacade.execute(databaseFacade.queries.addInsideSpotWithoutDeadlineToRegistration, [userId])
-      }
+      await databaseFacade.execute(databaseFacade.queries.addInsideSpotToRegistration, [paymentDeadline, userId])
     }
 
     else if (registration.roomPreference === 'insidepreference' && registration.receivedOutsideSpot) {
-      if (this.isAutomaticPaymentDeadlineAssignmentAvailable()) {
-        await databaseFacade.execute(databaseFacade.queries.addInsideSpotToRegistrationAndRemoveOutsideSpot, [conInfo.originalPaymentDeadline, userId])
-      }
-      else {
-        await databaseFacade.execute(databaseFacade.queries.addInsideSpotWithoutDeadlineToRegistrationAndRemoveOutsideSpot, [userId])
-      }
+      await databaseFacade.execute(databaseFacade.queries.addInsideSpotToRegistrationAndRemoveOutsideSpot, [paymentDeadline, userId])
     }
   },
 
 
-  async addOutsideSpotToWaitingRegistration (userId) {
-    if (this.isAutomaticPaymentDeadlineAssignmentAvailable()) {
-      await databaseFacade.execute(databaseFacade.queries.addOutsideSpotToRegistration, [conInfo.originalPaymentDeadline, userId])
+  async addOutsideSpotToWaitingRegistration (userId, paymentDeadline) {
+    await databaseFacade.execute(databaseFacade.queries.addOutsideSpotToRegistration, [paymentDeadline, userId])
+  },
+
+  
+  async getPaymentDeadline () {
+    let conInfo = await conApi.getConInfo()
+
+    if (new Date() > new Date(conInfo.originalPaymentDeadline)) {
+      return conInfo.finalPaymentDeadline
     }
     else {
-      await databaseFacade.execute(databaseFacade.queries.addOutsideSpotWithoutDeadlineToRegistration, [userId])
+      return conInfo.originalPaymentDeadline
     }
   },
 
 
-  isAutomaticPaymentDeadlineAssignmentAvailable () {
-    return new Date() < new Date(conInfo.newRegShouldGetManuallySetDeadlineDate)
-  },
+  async getSpotAvailabilityCount (allRegistrations) {
+    let conInfo = await conApi.getConInfo()
 
-
-  getSpotAvailabilityCount (allRegistrations) {
     let insideSpotsAvailable = conInfo.numberOfInsideSpots - allRegistrations.filter(r => r.receivedInsideSpot).length
     let outsideSpotsAvailable = conInfo.numberOfOutsideSpots - allRegistrations.filter(r => r.receivedOutsideSpot).length
     return {
@@ -460,9 +424,13 @@ module.exports = {
   },
 
 
-  validateRegistrationDetails (userId, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize) {
+  validateRegistrationDetails (userId, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie, tshirtSize, hoodieSize, donationAmount) {
     let areFieldsOk = utils.areFieldsDefinedAndNotNull(userId, roomPreference, earlyArrival, lateDeparture, buyTshirt, buyHoodie)
     let areMerchSizesOk = this.areMerchAndSizesValid(buyHoodie, hoodieSize, buyTshirt, tshirtSize)
+
+    if (donationAmount < 0) {
+      utils.throwError('Donation amount cannot be lower than zero.')
+    }
 
     let areDetailsOk = this.isRoomPreferenceLegal(roomPreference) && areFieldsOk && areMerchSizesOk
     if (!areDetailsOk) {
@@ -603,6 +571,6 @@ module.exports = {
   },
 
   parseRegistrationBooleans (registration) {
-    utils.convertIntsToBoolean(registration, 'earlyArrival', 'lateDeparture', 'buyTshirt', 'buyHoodie', 'needsManualPaymentDeadline', 'isAdminApproved', 'receivedInsideSpot', 'receivedOutsideSpot', 'isPaid')
+    utils.convertIntsToBoolean(registration, 'earlyArrival', 'lateDeparture', 'buyTshirt', 'buyHoodie', 'isAdminApproved', 'receivedInsideSpot', 'receivedOutsideSpot', 'isPaid')
   }
 }
