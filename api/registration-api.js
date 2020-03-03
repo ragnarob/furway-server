@@ -477,8 +477,10 @@ module.exports = {
           outsideCounter++
         }
         else {
+          if (!reg['receivedOutsideSpot']) {
+            outsideCounter++
+          }
           insideCounter++
-          outsideCounter++
         }
       }
     }
