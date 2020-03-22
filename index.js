@@ -32,6 +32,7 @@ app.use((req, res, next) => {
 require('./api/user-api').setupRoutes()
 require('./api/admin-api').setupRoutes()
 require('./api/registration-api').setupRoutes()
+require('./api/single-day-registration-api').setupRoutes()
 require('./api/auth-api').setupRoutes()
 require('./api/con-api').setupRoutes()
 require('./api/payment-api').setupRoutes()

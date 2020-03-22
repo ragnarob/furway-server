@@ -41,6 +41,12 @@ module.exports = {
   },
 
   parseConInfoFields (conInfo) {
+    conInfo.finalPaymentDeadline = conInfo.finalPaymentDeadline.substr(0, 16)
+    conInfo.originalPaymentDeadline = conInfo.originalPaymentDeadline.substr(0, 16)
+    conInfo.registrationCloseDate = conInfo.registrationCloseDate.substr(0, 16)
+    conInfo.registrationOpenDate = conInfo.registrationOpenDate.substr(0, 16)
+    conInfo.volunteerRegistrationOpenDate = conInfo.volunteerRegistrationOpenDate.substr(0, 16)
+    conInfo.singleDayTicketSaleOpenDate = conInfo.singleDayTicketSaleOpenDate.substr(0, 16)
     conInfo.mainDaysInsidePriceNok = Number(conInfo.mainDaysInsidePriceNok)
     conInfo.mainDaysOutsidePriceNok = Number(conInfo.mainDaysOutsidePriceNok)
     conInfo.earlyArrivalPriceNok = Number(conInfo.earlyArrivalPriceNok)
