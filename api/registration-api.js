@@ -78,6 +78,12 @@ module.exports = {
         this.rejectRegistration.bind(this), Number(req.params.userId));
       res.json(response)
     })
+
+    app.post('/api/registrations/user/:userId/refundChoice', async (req, res, throwErr) => {
+      let response = await handleAndAuthorize(req, res, throwErr, Number(req.params.userId),
+        this.setRefundChoice.bind(this), Number(req.params.userId), req.body.refundChoice)
+      res.json(response)
+    })
   },
 
 
@@ -418,6 +424,11 @@ module.exports = {
     return {success: true}
   },
 
+  async setRefundChoice (userId, refundChoice) {
+    await databaseFacade.execute(databaseFacade.queries.setRefundChoice, [refundChoice, userId])
+
+    return {success: true}
+  },
 
   isRoomPreferenceLegal (roomPreference) {
     return roomPreference !== undefined && ['insideonly', 'insidepreference', 'outsideonly'].includes(roomPreference.toLowerCase())

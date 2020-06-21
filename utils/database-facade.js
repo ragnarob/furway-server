@@ -1,7 +1,7 @@
 const mysql = require('mysql')
 const { databaseSettings } = require('../config')
 
-const getRegistrationsBase = 'SELECT user.username AS username, registration.id AS id, registration.registrationnumber AS registrationNumber, user.firstname AS firstName, user.lastname AS lastName, userid AS userId, roompreference AS roomPreference, earlyarrival AS earlyArrival, latedeparture AS lateDeparture, buytshirt AS buyTshirt, buyhoodie AS buyHoodie, tshirtsize AS tshirtSize, hoodiesize AS hoodieSize, registration.timestamp AS timestamp, paymentdeadline AS paymentDeadline, isadminapproved AS isAdminApproved, receivedinsidespot AS receivedInsideSpot, receivedoutsidespot AS receivedOutsideSpot, donationamount AS donationAmount, COALESCE(SUM(amount), 0) AS paidAmount FROM XXX INNER JOIN user ON (registration.userid = user.id) LEFT JOIN payment ON (registration.id = payment.registrationid) GROUP BY registration.id ORDER BY registration.timestamp ASC'
+const getRegistrationsBase = 'SELECT user.username AS username, registration.id AS id, registration.registrationnumber AS registrationNumber, user.firstname AS firstName, user.lastname AS lastName, userid AS userId, roompreference AS roomPreference, earlyarrival AS earlyArrival, latedeparture AS lateDeparture, buytshirt AS buyTshirt, buyhoodie AS buyHoodie, tshirtsize AS tshirtSize, hoodiesize AS hoodieSize, registration.timestamp AS timestamp, paymentdeadline AS paymentDeadline, isadminapproved AS isAdminApproved, receivedinsidespot AS receivedInsideSpot, receivedoutsidespot AS receivedOutsideSpot, refundchoice AS refundChoice, donationamount AS donationAmount, COALESCE(SUM(amount), 0) AS paidAmount FROM XXX INNER JOIN user ON (registration.userid = user.id) LEFT JOIN payment ON (registration.id = payment.registrationid) GROUP BY registration.id ORDER BY registration.timestamp ASC'
 
 const facade = module.exports = {
   mysqlPool: mysql.createPool(databaseSettings),
@@ -35,7 +35,7 @@ const facade = module.exports = {
       .replace(' registration.timestamp', ' cancelledregistration.timestamp')
       .replace(' registration.id', ' cancelledregistration.id'),
 
-    getRegistration: 'SELECT registration.id AS id, userid AS userId, registration.registrationnumber AS registrationNumber, roompreference AS roomPreference, earlyarrival AS earlyArrival, latedeparture AS lateDeparture, buytshirt AS buyTshirt, buyhoodie AS buyHoodie, tshirtsize AS tshirtSize, hoodiesize AS hoodieSize, registration.timestamp AS timestamp, paymentdeadline AS paymentDeadline, isadminapproved AS isAdminApproved, receivedinsidespot AS receivedInsideSpot, receivedoutsidespot AS receivedOutsideSpot, donationamount AS donationAmount, COALESCE(SUM(amount), 0) AS paidAmount FROM registration LEFT JOIN payment ON (registration.id = payment.registrationid) WHERE userid = ?',
+    getRegistration: 'SELECT registration.id AS id, userid AS userId, registration.registrationnumber AS registrationNumber, roompreference AS roomPreference, earlyarrival AS earlyArrival, latedeparture AS lateDeparture, buytshirt AS buyTshirt, buyhoodie AS buyHoodie, tshirtsize AS tshirtSize, hoodiesize AS hoodieSize, registration.timestamp AS timestamp, paymentdeadline AS paymentDeadline, isadminapproved AS isAdminApproved, receivedinsidespot AS receivedInsideSpot, receivedoutsidespot AS receivedOutsideSpot, refundchoice AS refundChoice, donationamount AS donationAmount, COALESCE(SUM(amount), 0) AS paidAmount FROM registration LEFT JOIN payment ON (registration.id = payment.registrationid) WHERE userid = ? GROUP BY registration.id',
 
     getRegistrationSimple: 'SELECT * FROM registration WHERE userid = ?',
 
@@ -58,6 +58,8 @@ const facade = module.exports = {
     approveRegistration: 'UPDATE registration SET isadminapproved = 1, registrationnumber = (SELECT num FROM (SELECT IFNULL((SELECT MAX(registrationnumber) FROM registration), 0) + 1 AS num) AS nextregnum) WHERE userid = ?',
 
     rejectRegistration: 'UPDATE registration SET isadminapproved = 0 WHERE userid = ?',
+
+    setRefundChoice: 'UPDATE registration SET refundchoice = ? WHERE userid = ?',
 
     removeSpotFromRegistration: 'UPDATE registration SET receivedinsidespot = 0, receivedoutsidespot = 0, isadminapproved = 0, timestamp = NOW(3) WHERE userid = ?',
 
